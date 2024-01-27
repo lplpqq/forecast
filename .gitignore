@@ -1,1 +1,7 @@
 /**/__pycache__
+/config/dev.yaml
+/.ruff_cache
+/.venv
+
+/runtime.log
+/test.log

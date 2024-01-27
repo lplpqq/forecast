@@ -1,0 +1,3 @@
+data_sources:
+  weatherbit:
+    api_key: "your_api_key"
