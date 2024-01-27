@@ -1,4 +1,5 @@
 from abc import ABC
+from typing import Optional
 
 from aiohttp import ClientSession
 
@@ -7,13 +8,13 @@ from forecast.logging import logger_provider
 
 class Requestor(ABC):
     def __init__(
-        self, api_key: str, base_endpoint_url: str, session: ClientSession
+        self, base_endpoint_url: str, session: ClientSession, api_key: Optional[str] = None
     ) -> None:
         self.logger = logger_provider(__name__)
 
-        self.api_key = api_key
         self.base_endpoint_url = base_endpoint_url
         self.session = session
+        self.api_key = api_key
 
     async def _request(
             self,

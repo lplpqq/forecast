@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Optional
 
 from aiohttp import ClientSession
 from pydantic_extra_types.coordinate import Coordinate
@@ -8,30 +8,29 @@ from forecast.enums import Granularity
 from forecast.services.base import Provider
 
 
-class VisualCrossing(Provider):
+class OpenMeteo(Provider):
     def __init__(self, session: ClientSession, api_key: Optional[str] = None):
-        super(VisualCrossing, self).__init__('https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata',
-                                             session,
-                                             api_key)
+        super(OpenMeteo, self).__init__('https://archive-api.open-meteo.com/v1',
+                                        session,
+                                        api_key)
 
     async def get_historical_weather(self, granularity: Granularity,
                                      coordinate: Coordinate,
                                      start_date: datetime, end_date: datetime):
         if granularity is Granularity.HOUR:
-            aggregate_hours = 1
+            key = 'hourly'
         elif granularity is Granularity.DAY:
-            aggregate_hours = 24
+            key = 'daily'
         else:
             raise ValueError(...)
 
         return await self._get(
-            f'/history',
+            f'/archive',
             params={
-                'aggregateHours': aggregate_hours,
-                'location': f'{coordinate.longitude},{coordinate.latitude}',
+                'latitude': coordinate.latitude,
+                'longitude': coordinate.longitude,
                 'start_date': start_date.strftime("%Y-%m-%d"),
                 'end_date': end_date.strftime("%Y-%m-%d"),
-                'contentType': 'json',
-                'key': self.api_key,
+                key: ["temperature_2m", "relative_humidity_2m", "apparent_temperature", "precipitation", "rain", "snowfall", "snow_depth", "surface_pressure", "cloud_cover", "wind_speed_10m", "wind_speed_100m", "wind_direction_10m", "wind_direction_100m", "wind_gusts_10m"]
             }
         )

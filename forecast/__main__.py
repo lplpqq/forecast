@@ -7,19 +7,18 @@ from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
 from forecast.config import config
 from forecast.logging import logger_provider
-from forecast.models import Granularity
-from forecast.services import WeatherBit, VisualCrossing, OpenWeatherMap
-
+from forecast.enums import Granularity
+from forecast.services import WeatherBit, VisualCrossing, OpenWeatherMap, Tomorrow, OpenMeteo
 
 logger = logger_provider(__name__)
 
 
-async def main() -> None:
-    logger.info('Starting')
 
+async def main() -> None:
+
+    logger.info('Starting')
     async with ClientSession() as session:
-        # weatherbit = WeatherBit('3bc5d56a89f247758f55c4023ad95035', session)
-        #
+        #  weatherbit = WeatherBit(session, config.weatherbit.api_key)
         # print(await weatherbit.get_historical_weather(
         #     'hourly',
         #     Coordinate(
@@ -34,7 +33,7 @@ async def main() -> None:
         #     end_date=datetime(2024, 1, 15)
         # ))
 
-        # openweathermap = OpenWeatherMap('a20aa632a3c99a507410683fca11f82e', session)
+        # openweathermap = OpenWeatherMap(session, "a20aa632a3c99a507410683fca11f82e")
         # print(await openweathermap.get_historical_weather(
         #     Granularity.HOUR,
         #     Coordinate(
@@ -49,8 +48,38 @@ async def main() -> None:
         #     end_date=datetime(2024, 1, 15)
         # ))
 
-        visualcrossing = VisualCrossing('RBVMRGLJV3PLQQU8WQ8AJ6LAV', session)
-        print(await visualcrossing.get_historical_weather(
+        # visualcrossing = VisualCrossing(session, 'RBVMRGLJV3PLQQU8WQ8AJ6LAV')
+        # print(await visualcrossing.get_historical_weather(
+        #     Granularity.HOUR,
+        #     Coordinate(
+        #         latitude=Latitude(
+        #             35.6897
+        #         ),
+        #         longitude=Longitude(
+        #             139.6922
+        #         )
+        #     ),
+        #     start_date=datetime(2024, 1, 5),
+        #     end_date=datetime(2024, 1, 15)
+        # ))
+
+        # tomorrow = Tomorrow(session, "bLF6xqSruT4ascFmen5Vj5DmxU2IaGXA")
+        # print(await tomorrow.get_historical_weather(
+        #     Granularity.HOUR,
+        #     Coordinate(
+        #         latitude=Latitude(
+        #             35.6897
+        #         ),
+        #         longitude=Longitude(
+        #             139.6922
+        #         )
+        #     ),
+        #     start_date=datetime(2024, 1, 5),
+        #     end_date=datetime(2024, 1, 15)
+        # ))
+
+        open_meteo = OpenMeteo(session)
+        print(await open_meteo.get_historical_weather(
             Granularity.HOUR,
             Coordinate(
                 latitude=Latitude(

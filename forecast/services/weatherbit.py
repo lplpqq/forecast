@@ -1,16 +1,18 @@
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from aiohttp import ClientSession
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.models import Granularity
+from forecast.enums import Granularity
 from .base import Provider
 
 
 class WeatherBit(Provider):
-    def __init__(self, api_key: str, session: ClientSession):
-        super(WeatherBit, self).__init__(api_key, 'https://api.weatherbit.io/v2.0', session)
+    def __init__(self, session: ClientSession, api_key: Optional[str] = None):
+        super(WeatherBit, self).__init__('https://api.weatherbit.io/v2.0',
+                                         session,
+                                         api_key)
 
     async def get_historical_weather(self, granularity: Literal['hourly', 'daily'],
                                      coordinate: Coordinate,

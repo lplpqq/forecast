@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.models import Granularity
+from forecast.enums import Granularity
 from forecast.services.base import Requestor
 
 
