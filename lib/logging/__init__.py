@@ -1,7 +1,8 @@
 import logging
-import logging.config
+
 from contextvars import ContextVar
 from pathlib import Path
+
 
 DEFAULT_MAIN_LOGGER_NAME = 'main'
 DEFAULT_LOG_FILE = Path('./runtime.log')

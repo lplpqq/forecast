@@ -4,7 +4,7 @@ from typing import Literal
 from aiohttp import ClientSession
 from pydantic_extra_types.coordinate import Coordinate
 
-from models import Granularity
+from forecast.models import Granularity
 from .base import Provider
 
 
