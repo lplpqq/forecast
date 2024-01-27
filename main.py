@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 from aiohttp import ClientSession
 
+from models import Granularity
 from services import WeatherBit, OpenWeatherMap, VisualCrossing
 
 
@@ -27,7 +28,7 @@ async def main():
 
         # openweathermap = OpenWeatherMap('a20aa632a3c99a507410683fca11f82e', session)
         # print(await openweathermap.get_historical_weather(
-        #     'hour',
+        #     Granularity.HOUR,
         #     Coordinate(
         #         latitude=Latitude(
         #            35.6897
@@ -42,7 +43,7 @@ async def main():
 
         visualcrossing = VisualCrossing('RBVMRGLJV3PLQQU8WQ8AJ6LAV', session)
         print(await visualcrossing.get_historical_weather(
-            'day',
+            Granularity.HOUR,
             Coordinate(
                 latitude=Latitude(
                    35.6897
