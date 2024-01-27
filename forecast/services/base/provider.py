@@ -5,7 +5,7 @@ from typing import Any
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
-from forecast.services.base.requestor import Requestor
+from forecast.services.base import Requestor
 
 
 class Provider(Requestor):
