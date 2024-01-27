@@ -39,20 +39,20 @@ async def main() -> None:
     #     start_date=datetime(2024, 1, 5),
     #     end_date=datetime(2024, 1, 15)
     # ))
-        # openweathermap = OpenWeatherMap(session, "a20aa632a3c99a507410683fca11f82e")
-        # print(await openweathermap.get_historical_weather(
-        #     Granularity.HOUR,
-        #     Coordinate(
-        #         latitude=Latitude(
-        #            35.6897
-        #         ),
-        #         longitude=Longitude(
-        #             139.6922
-        #         )
-        #     ),
-        #     start_date=datetime(2024, 1, 5),
-        #     end_date=datetime(2024, 1, 15)
-        # ))
+    # openweathermap = OpenWeatherMap(session, "a20aa632a3c99a507410683fca11f82e")
+    # print(await openweathermap.get_historical_weather(
+    #     Granularity.HOUR,
+    #     Coordinate(
+    #         latitude=Latitude(
+    #            35.6897
+    #         ),
+    #         longitude=Longitude(
+    #             139.6922
+    #         )
+    #     ),
+    #     start_date=datetime(2024, 1, 5),
+    #     end_date=datetime(2024, 1, 15)
+    # ))
 
     # visualcrossing = VisualCrossing('RBVMRGLJV3PLQQU8WQ8AJ6LAV')
     # print(
