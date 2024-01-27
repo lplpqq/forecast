@@ -1,5 +1,6 @@
 from typing import Optional
 
+from aiohttp import ClientSession
 from requests import Session, RequestException
 
 
@@ -7,12 +8,12 @@ class Requestor:
     def __init__(self,
                  api_key: str,
                  base_endpoint_url: str,
-                 session: Session):
+                 session: ClientSession):
         self.api_key = api_key
         self.base_endpoint_url = base_endpoint_url
         self.session = session
 
-    def _request(
+    async def _request(
             self,
             path: str,
             *,
@@ -22,19 +23,11 @@ class Requestor:
         if not path.startswith("https://"):
             path = self.base_endpoint_url + path
 
-        try:
-            resp = self.session.request(
-                method,
-                path,
-                **kwargs
-            )
-            resp.raise_for_status()
-            return resp
-        except RequestException as e:
-            raise e
+        async with self.session.request(method, path, **kwargs) as response:
+            return await response.text()
 
-    def _get(self, path: str, **kwargs):
-        return self._request(path, method="GET", **kwargs).json()
+    async def _get(self, path: str, **kwargs):
+        return await self._request(path, method="GET", **kwargs)
 
-    def _post(self, path: str, **kwargs):
-        return self._request(path, method="POST", **kwargs).json()
+    async def _post(self, path: str, **kwargs):
+        return await self._request(path, method="POST", **kwargs)
