@@ -13,7 +13,7 @@ class VisualCrossing(Provider):
         super(VisualCrossing, self).__init__(
             api_key,
             'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata',
-            conn
+            conn,
         )
 
     async def get_historical_weather(

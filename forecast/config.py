@@ -9,9 +9,16 @@ class BaseDataSourceConfig(BaseModel):
     api_key: str
 
 
-class WeatherBitSourceConfig(BaseDataSourceConfig): ...
-class OpenWeartherMapSourceConfig(BaseDataSourceConfig): ...
-class VisualCrossingSourceConfig(BaseDataSourceConfig): ...
+class WeatherBitSourceConfig(BaseDataSourceConfig):
+    ...
+
+
+class OpenWeartherMapSourceConfig(BaseDataSourceConfig):
+    ...
+
+
+class VisualCrossingSourceConfig(BaseDataSourceConfig):
+    ...
 
 
 class SourcesConfig(BaseModel):

@@ -10,8 +10,9 @@ from .base import Provider
 
 GRANULARITY_TO_STRING: dict[Granularity, Literal['hourly', 'daily']] = {
     Granularity.HOUR: 'hourly',
-    Granularity.DAY: 'hourly'
+    Granularity.DAY: 'hourly',
 }
+
 
 class WeatherBit(Provider):
     def __init__(self, api_key: str, conn: aiohttp.TCPConnector) -> None:

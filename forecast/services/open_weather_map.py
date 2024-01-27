@@ -9,7 +9,7 @@ from forecast.services.base import Provider
 
 GRANULARITY_TO_STRING: dict[Granularity, str] = {
     Granularity.HOUR: 'hour',
-    Granularity.DAY: 'day'
+    Granularity.DAY: 'day',
 }
 
 

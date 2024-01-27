@@ -1,13 +1,8 @@
 import asyncio
-from datetime import datetime
 
 import uvloop
-from aiohttp import ClientSession
-from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
-from forecast.enums import Granularity
 from forecast.logging import logger_provider
-from forecast.services import OpenWeatherMap, VisualCrossing, WeatherBit
 
 logger = logger_provider(__name__)
 

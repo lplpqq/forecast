@@ -10,8 +10,7 @@ from forecast.logging import logger_provider
 
 class Requestor(ABC):
     def __init__(
-        self, api_key: str, base_endpoint_url: str,
-        conn: aiohttp.TCPConnector
+        self, api_key: str, base_endpoint_url: str, conn: aiohttp.TCPConnector
     ) -> None:
         self.logger = logger_provider(__name__)
 
@@ -30,7 +29,7 @@ class Requestor(ABC):
         self,
         exc_type: type[BaseException],
         exc_value: BaseException,
-        traceback: TracebackType
+        traceback: TracebackType,
     ) -> None:
         if self._session is None:
             return
@@ -38,11 +37,7 @@ class Requestor(ABC):
         await self._session.close()
 
     async def _request(
-        self,
-        path: str,
-        *,
-        method: str,
-        **kwargs: Any
+        self, path: str, *, method: str, **kwargs: Any
     ) -> dict[Any, Any]:
         if self._session is None:
             raise RuntimeError('Session is not established')
