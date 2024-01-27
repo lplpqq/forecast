@@ -5,12 +5,19 @@ from pydantic import BaseModel
 from lib.config import BaseConfig
 
 
-class WeatherBitSourceConfig(BaseModel):
+class BaseDataSourceConfig(BaseModel):
     api_key: str
 
 
+class WeatherBitSourceConfig(BaseDataSourceConfig): ...
+class OpenWeartherMapSourceConfig(BaseDataSourceConfig): ...
+class VisualCrossingSourceConfig(BaseDataSourceConfig): ...
+
+
 class SourcesConfig(BaseModel):
-    weatherbit: WeatherBitSourceConfig
+    weather_bit: WeatherBitSourceConfig
+    open_weather_map: OpenWeartherMapSourceConfig
+    visual_crossing: VisualCrossingSourceConfig
 
 
 class Config(BaseConfig):
