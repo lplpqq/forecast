@@ -1,8 +1,6 @@
 import asyncio
 from datetime import datetime
 
-from fastapi import FastAPI
-from requests import Session
 from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 from aiohttp import ClientSession
 

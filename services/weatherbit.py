@@ -2,8 +2,7 @@ from datetime import datetime
 from typing import Literal
 
 from aiohttp import ClientSession
-from requests import Session
-from pydantic_extra_types.coordinate import Latitude, Longitude, Coordinate
+from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
 from .base import Requestor
 

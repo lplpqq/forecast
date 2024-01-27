@@ -1,7 +1,4 @@
-from typing import Optional
-
 from aiohttp import ClientSession
-from requests import Session, RequestException
 
 
 class Requestor:
