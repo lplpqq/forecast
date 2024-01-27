@@ -1,7 +1,11 @@
 import asyncio
 
 import uvloop
+from sqlalchemy import select
 
+from forecast import models
+from forecast.config import config
+from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
 
 logger = logger_provider(__name__)
@@ -9,6 +13,15 @@ logger = logger_provider(__name__)
 
 async def main() -> None:
     logger.info('Starting')
+
+    engine = create_engine(config)
+    session_factory = await connect(engine)
+
+    async with session_factory() as session:
+        get_hourly_weather_query = select(models.HourlyWeather).limit(10)
+        hourly_weather = (await session.scalars(get_hourly_weather_query)).all()
+
+        print(hourly_weather)
 
     # weatherbit = WeatherBit('3bc5d56a89f247758f55c4023ad95035')
     # print(await weatherbit.get_historical_weather(

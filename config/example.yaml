@@ -5,3 +5,5 @@ data_sources:
     api_key: "your_api_key"
   visual_crossing:
     api_key: "your_api_key"
+db:
+  connection_string: "your_postgres_connection_string"
