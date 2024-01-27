@@ -13,7 +13,7 @@ from tests.config import config
 
 @pytest.mark.asyncio
 async def test_weatherbit(connector: TCPConnector) -> None:
-    async with WeatherBit(config.data_sources.weather_bit.api_key, connector) as weatherbit:
+    async with WeatherBit(connector, config.data_sources.weather_bit.api_key) as weatherbit:
         print(
             await weatherbit.get_historical_weather(
                 Granularity.HOUR,
@@ -26,8 +26,8 @@ async def test_weatherbit(connector: TCPConnector) -> None:
 @pytest.mark.asyncio
 async def test_open_weather_map(connector: TCPConnector) -> None:
     async with OpenWeatherMap(
+        connector,
         config.data_sources.open_weather_map.api_key,
-        connector
     ) as openweathermap:
         print(await openweathermap.get_historical_weather(
             Granularity.HOUR,
@@ -46,8 +46,8 @@ async def test_open_weather_map(connector: TCPConnector) -> None:
 @pytest.mark.asyncio
 async def test_visaul_crossing(connector: TCPConnector) -> None:
      async with VisualCrossing(
+        connector,
         config.data_sources.visual_crossing.api_key,
-        connector
     ) as visualcrossing:
         print(
             await visualcrossing.get_historical_weather(

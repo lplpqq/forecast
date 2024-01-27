@@ -1,7 +1,6 @@
 from datetime import datetime
-from typing import Optional
 
-from aiohttp import ClientSession
+import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
@@ -9,9 +8,9 @@ from forecast.services.base import Provider
 
 
 class OpenMeteo(Provider):
-    def __init__(self, session: ClientSession, api_key: Optional[str] = None):
+    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None = None) -> None:
         super(OpenMeteo, self).__init__(
-            'https://archive-api.open-meteo.com/v1', session, api_key
+            'https://archive-api.open-meteo.com/v1', conn, api_key
         )
 
     async def get_historical_weather(

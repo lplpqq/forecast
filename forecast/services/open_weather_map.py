@@ -14,9 +14,9 @@ GRANULARITY_TO_STRING: dict[Granularity, str] = {
 
 
 class OpenWeatherMap(Provider):
-    def __init__(self, api_key: str, conn: aiohttp.TCPConnector) -> None:
+    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
         super(OpenWeatherMap, self).__init__(
-            api_key, 'https://history.openweathermap.org/data/2.5', conn
+            'https://history.openweathermap.org/data/2.5', conn, api_key
         )
 
     async def get_historical_weather(

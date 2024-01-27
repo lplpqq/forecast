@@ -10,7 +10,7 @@ from forecast.logging import logger_provider
 
 class Requestor(ABC):
     def __init__(
-        self, api_key: str, base_endpoint_url: str, conn: aiohttp.TCPConnector
+        self, base_endpoint_url: str, conn: aiohttp.TCPConnector, api_key: str | None
     ) -> None:
         self.logger = logger_provider(__name__)
 

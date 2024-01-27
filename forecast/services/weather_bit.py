@@ -15,9 +15,9 @@ GRANULARITY_TO_STRING: dict[Granularity, Literal['hourly', 'daily']] = {
 
 
 class WeatherBit(Provider):
-    def __init__(self, api_key: str, conn: aiohttp.TCPConnector) -> None:
+    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
         super(WeatherBit, self).__init__(
-            api_key, 'https://api.weatherbit.io/v2.0/', conn
+            'https://api.weatherbit.io/v2.0/', conn, api_key
         )
 
     async def get_historical_weather(

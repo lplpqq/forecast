@@ -9,11 +9,11 @@ from forecast.services.base import Provider
 
 
 class VisualCrossing(Provider):
-    def __init__(self, api_key: str, conn: aiohttp.TCPConnector) -> None:
+    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
         super(VisualCrossing, self).__init__(
-            api_key,
             'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata',
             conn,
+            api_key,
         )
 
     async def get_historical_weather(

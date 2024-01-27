@@ -12,6 +12,5 @@ setup_logging('forecast_test', TEST_LOG_FILE)
 
 @pytest.fixture(params=["asyncio"])
 @pytest.mark.asyncio
-async def connector(event_loop: AbstractEventLoop) -> TCPConnector:
-    print(event_loop)
+async def connector() -> TCPConnector:
     return TCPConnector(limit=10)

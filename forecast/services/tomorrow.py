@@ -1,7 +1,6 @@
 from datetime import datetime
-from typing import Optional
 
-from aiohttp import ClientSession
+import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
@@ -9,8 +8,8 @@ from forecast.services.base import Provider
 
 
 class Tomorrow(Provider):
-    def __init__(self, session: ClientSession, api_key: Optional[str] = None):
-        super(Tomorrow, self).__init__('https://api.tomorrow.io/v4', session, api_key)
+    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
+        super(Tomorrow, self).__init__('https://api.tomorrow.io/v4', conn, api_key)
 
     async def get_historical_weather(
         self,
