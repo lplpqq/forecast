@@ -9,7 +9,7 @@ from forecast.services.base import Provider
 
 class Tomorrow(Provider):
     def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        super(Tomorrow, self).__init__('https://api.tomorrow.io/v4', conn, api_key)
+        super(Provider, self).__init__('https://api.tomorrow.io/v4', conn, api_key)
 
     async def get_historical_weather(
         self,

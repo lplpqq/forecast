@@ -1,12 +1,12 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
-
-from .base import Provider
+from forecast.services.base import Provider
+from forecast.services.schema.weather_bit import WeatherBitSchema
 
 GRANULARITY_TO_STRING: dict[Granularity, Literal['hourly', 'daily']] = {
     Granularity.HOUR: 'hourly',
@@ -16,9 +16,7 @@ GRANULARITY_TO_STRING: dict[Granularity, Literal['hourly', 'daily']] = {
 
 class WeatherBit(Provider):
     def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        super(WeatherBit, self).__init__(
-            'https://api.weatherbit.io/v2.0/', conn, api_key
-        )
+        super(Provider, self).__init__('https://api.weatherbit.io/v2.0/', conn, api_key)
 
     async def get_historical_weather(
         self,
@@ -26,10 +24,10 @@ class WeatherBit(Provider):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ) -> dict[Any, Any]:
+    ) -> WeatherBitSchema:
         granularity_string = GRANULARITY_TO_STRING[granularity]
 
-        return await self._get(
+        raw = await self._get(
             f'/history/{granularity_string}',
             params={
                 'lat': coordinate.latitude,
@@ -39,3 +37,5 @@ class WeatherBit(Provider):
                 'key': self.api_key,
             },
         )
+
+        return WeatherBitSchema.model_validate(raw)

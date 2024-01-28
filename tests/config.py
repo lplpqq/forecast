@@ -16,5 +16,4 @@ else:
                 shutil.copy(dev_config_file, config_file)
 
 
-
 config = Config.load(config_file)

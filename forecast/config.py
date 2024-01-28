@@ -3,8 +3,8 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from forecast.logging import logger_provider
-from forecast.utils.format_path import format_path
 from lib.config import BaseConfig
+from lib.fs_utils import format_path
 
 logger = logger_provider(__name__)
 

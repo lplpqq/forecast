@@ -9,7 +9,7 @@ from forecast.services.base import Provider
 
 class OpenMeteo(Provider):
     def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None = None) -> None:
-        super(OpenMeteo, self).__init__(
+        super(Provider, self).__init__(
             'https://archive-api.open-meteo.com/v1', conn, api_key
         )
 

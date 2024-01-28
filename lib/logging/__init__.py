@@ -1,8 +1,6 @@
 import logging
-
 from contextvars import ContextVar
 from pathlib import Path
-
 
 DEFAULT_MAIN_LOGGER_NAME = 'main'
 DEFAULT_LOG_FILE = Path('./runtime.log')
@@ -21,8 +19,7 @@ class LoggerProvider:
 
 
 def setup_logging(
-    main_logger_name: str = DEFAULT_MAIN_LOGGER_NAME,
-    log_file: Path = DEFAULT_LOG_FILE
+    main_logger_name: str = DEFAULT_MAIN_LOGGER_NAME, log_file: Path = DEFAULT_LOG_FILE
 ) -> LoggerProvider:
     _main_logger_name.set(main_logger_name)
     _log_file.set(log_file)

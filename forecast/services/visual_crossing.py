@@ -1,16 +1,16 @@
 from datetime import datetime
-from typing import Any
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
 from forecast.services.base import Provider
+from forecast.services.schema.visual_crossing import VisualCrossingSchema
 
 
 class VisualCrossing(Provider):
     def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        super(VisualCrossing, self).__init__(
+        super(Provider, self).__init__(
             'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata',
             conn,
             api_key,
@@ -22,10 +22,10 @@ class VisualCrossing(Provider):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ) -> dict[Any, Any]:
+    ) -> VisualCrossingSchema:
         aggregate_hours = granularity.value
 
-        return await self._get(
+        raw = await self._get(
             '/history',
             params={
                 'aggregateHours': aggregate_hours,
@@ -36,3 +36,5 @@ class VisualCrossing(Provider):
                 'key': self.api_key,
             },
         )
+
+        return VisualCrossingSchema.model_validate(raw)

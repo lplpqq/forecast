@@ -1,4 +1,3 @@
-from lib.logging import LoggerProvider, setup_logging
+from lib.logging import setup_logging
 
-setup_logging('forecast')
-logger_provider = LoggerProvider()
+logger_provider = setup_logging('forecast')

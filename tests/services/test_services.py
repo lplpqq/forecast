@@ -13,7 +13,9 @@ from tests.config import config
 
 @pytest.mark.asyncio
 async def test_weatherbit(connector: TCPConnector) -> None:
-    async with WeatherBit(connector, config.data_sources.weather_bit.api_key) as weatherbit:
+    async with WeatherBit(
+        connector, config.data_sources.weather_bit.api_key
+    ) as weatherbit:
         print(
             await weatherbit.get_historical_weather(
                 Granularity.HOUR,
@@ -23,29 +25,26 @@ async def test_weatherbit(connector: TCPConnector) -> None:
             )
         )
 
+
 @pytest.mark.asyncio
 async def test_open_weather_map(connector: TCPConnector) -> None:
     async with OpenWeatherMap(
         connector,
         config.data_sources.open_weather_map.api_key,
     ) as openweathermap:
-        print(await openweathermap.get_historical_weather(
-            Granularity.HOUR,
-            Coordinate(
-                latitude=Latitude(
-                   35.6897
-                ),
-                longitude=Longitude(
-                    139.6922
-                )
-            ),
-            start_date=datetime(2024, 1, 5),
-            end_date=datetime(2024, 1, 15)
-        ))
+        print(
+            await openweathermap.get_historical_weather(
+                Granularity.HOUR,
+                Coordinate(latitude=Latitude(35.6897), longitude=Longitude(139.6922)),
+                start_date=datetime(2024, 1, 5),
+                end_date=datetime(2024, 1, 15),
+            )
+        )
+
 
 @pytest.mark.asyncio
 async def test_visaul_crossing(connector: TCPConnector) -> None:
-     async with VisualCrossing(
+    async with VisualCrossing(
         connector,
         config.data_sources.visual_crossing.api_key,
     ) as visualcrossing:
@@ -57,5 +56,3 @@ async def test_visaul_crossing(connector: TCPConnector) -> None:
                 end_date=datetime(2024, 1, 15),
             )
         )
-
-

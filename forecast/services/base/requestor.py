@@ -18,12 +18,32 @@ class Requestor(ABC):
         self.base_endpoint_url = base_endpoint_url
 
         self._connector = conn
+
         self._session: ClientSession | None = None
+        self.is_setup = False
+
+    async def setup(self) -> None:
+        if self.is_setup:
+            self.logger.warning(
+                'Requestor is already setup, no need to class .setup() twice.'
+            )
+            return
+
+        self._session = ClientSession(connector=self._connector)
+        self.is_setup = True
 
     async def __aenter__(self) -> Self:
-        self._session = ClientSession(connector=self._connector)
+        await self.setup()
 
         return self
+
+    async def clean_up(self) -> None:
+        if self._session is None:
+            self.logger.warning('You may not disconnect before even connecting.')
+            return
+
+        await self._session.close()
+        self.is_setup = False
 
     async def __aexit__(
         self,
@@ -31,10 +51,7 @@ class Requestor(ABC):
         exc_value: BaseException,
         traceback: TracebackType,
     ) -> None:
-        if self._session is None:
-            return
-
-        await self._session.close()
+        await self.clean_up()
 
     async def _request(
         self, path: str, *, method: str, **kwargs: Any
