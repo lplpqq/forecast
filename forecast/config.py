@@ -25,10 +25,15 @@ class VisualCrossingSourceConfig(BaseDataSourceConfig):
     ...
 
 
+class TomorrowSourceConfig(BaseDataSourceConfig):
+    ...
+
+
 class SourcesConfig(BaseModel):
     weather_bit: WeatherBitSourceConfig
     open_weather_map: OpenWeartherMapSourceConfig
     visual_crossing: VisualCrossingSourceConfig
+    tomorrow: TomorrowSourceConfig
 
 
 class DBConfig(BaseModel):
