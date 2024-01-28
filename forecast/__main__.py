@@ -12,7 +12,7 @@ from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.enums import Granularity
 from forecast.logging import logger_provider
-from forecast.providers import OpenWeatherMap, VisualCrossing, WeatherBit, OpenMeteo, Tomorrow
+from forecast.providers import OpenWeatherMap, VisualCrossing, WeatherBit, OpenMeteo, Tomorrow, WorldWeatherOnline
 
 logger = logger_provider(__name__)
 
@@ -29,7 +29,22 @@ async def main() -> None:
     #
     #     print(hourly_weather)
 
-    #async with TCPConnector() as connector:
+    async with TCPConnector() as connector:
+        # async with WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key) as world_weather:
+        #     print(await world_weather.get_historical_weather(
+        #         Granularity.HOUR,
+        #         Coordinate(
+        #             latitude=Latitude(
+        #                 35.6897
+        #             ),
+        #             longitude=Longitude(
+        #                 139.6922
+        #             )
+        #         ),
+        #         start_date=datetime(2024, 1, 5),
+        #         end_date=datetime(2024, 1, 15)
+        #     ))
+
         # weatherbit = WeatherBit(connector, '3bc5d56a89f247758f55c4023ad95035')
         # await weatherbit.setup()
         # print(await weatherbit.get_historical_weather(
@@ -54,26 +69,27 @@ async def main() -> None:
             #             35.6897
             #         ),
             #         longitude=Longitude(
-            #             139.6922
+            #             on
             #         )
             #     ),
             #     start_date=datetime(2024, 1, 5),
             #     end_date=datetime(2024, 1, 15)
             # ))
-        # async with Tomorrow(connector, config.data_sources.tomorrow.api_key) as tomorrow:
-        #     print(await tomorrow.get_historical_weather(
-        #         Granularity.HOUR,
-        #         Coordinate(
-        #             latitude=Latitude(
-        #                 35.6897
-        #             ),
-        #             longitude=Longitude(
-        #                 139.6922
-        #             )
-        #         ),
-        #         start_date=datetime(2024, 1, 5),
-        #         end_date=datetime(2024, 1, 15)
-        #     ))
+
+        async with Tomorrow(connector, config.data_sources.tomorrow.api_key) as tomorrow:
+            print(await tomorrow.get_historical_weather(
+                Granularity.HOUR,
+                Coordinate(
+                    latitude=Latitude(
+                        35.6897
+                    ),
+                    longitude=Longitude(
+                        139.6922
+                    )
+                ),
+                start_date=datetime(2024, 1, 5),
+                end_date=datetime(2024, 1, 15)
+            ))
 
         # openweathermap = OpenWeatherMap(connector, config.data_sources.open_weather_map.api_key)
         # await openweathermap.setup()

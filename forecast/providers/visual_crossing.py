@@ -5,7 +5,7 @@ from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
 from forecast.providers.base import Provider
-from forecast.providers.schema.visual_crossing import VisualCrossingSchema
+#from forecast.providers.schema.visual_crossing import VisualCrossingSchema
 
 
 class VisualCrossing(Provider):
@@ -22,7 +22,7 @@ class VisualCrossing(Provider):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ) -> VisualCrossingSchema:
+    ):# -> VisualCrossingSchema:
         aggregate_hours = granularity.value
 
         raw = await self._get(
@@ -36,5 +36,5 @@ class VisualCrossing(Provider):
                 'key': self.api_key,
             },
         )
-
-        return VisualCrossingSchema.model_validate(raw)
+        return raw
+        #return VisualCrossingSchema.model_validate(raw)

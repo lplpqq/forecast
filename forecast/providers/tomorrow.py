@@ -18,20 +18,13 @@ class Tomorrow(Provider):
         start_date: datetime,
         end_date: datetime,
     ):
-        if granularity is Granularity.HOUR:
-            aggregate_hours = 1
-        elif granularity is Granularity.DAY:
-            aggregate_hours = 24
-        else:
-            raise ValueError(...)
-
         return await self._post(
             '/historical',
             params={
                 'apikey': self.api_key,
             },
             json={
-                'timesteps': [f'{aggregate_hours}h'],
+                'timesteps': [f'{granularity.value}h'],
                 'startTime': start_date.isoformat(),
                 'endTime': end_date.isoformat(),
                 'units': 'metric',
