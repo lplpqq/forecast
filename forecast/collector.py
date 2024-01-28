@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from pydantic_extra_types.coordinate import Coordinate
-from services.base import Provider
+from providers.base import Provider
 
 from forecast.enums import Granularity
 

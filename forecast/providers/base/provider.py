@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
-from forecast.services.base.requestor import Requestor
+from forecast.providers.base.requestor import Requestor
 
 HistoricalWeather: TypeAlias = dict[Any, Any] | BaseModel
 

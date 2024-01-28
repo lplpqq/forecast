@@ -4,8 +4,8 @@ import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
-from forecast.services.base import Provider
-from forecast.services.schema.visual_crossing import VisualCrossingSchema
+from forecast.providers.base import Provider
+from forecast.providers.schema.visual_crossing import VisualCrossingSchema
 
 
 class VisualCrossing(Provider):

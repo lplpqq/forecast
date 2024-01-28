@@ -26,8 +26,8 @@ from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
 from forecast.config import Config
 from forecast.enums.resolution import Granularity
-from forecast.services.base import Provider
-from forecast.services.base.provider import HistoricalWeather
+from forecast.providers.base import Provider
+from forecast.providers.base.provider import HistoricalWeather
 from lib.fs_utils import validate_path
 from lib.logging import setup_logging
 

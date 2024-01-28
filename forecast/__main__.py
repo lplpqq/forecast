@@ -12,7 +12,7 @@ from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.enums import Granularity
 from forecast.logging import logger_provider
-from forecast.services import OpenWeatherMap, VisualCrossing, WeatherBit, OpenMeteo, Tomorrow
+from forecast.providers import OpenWeatherMap, VisualCrossing, WeatherBit, OpenMeteo, Tomorrow
 
 logger = logger_provider(__name__)
 
