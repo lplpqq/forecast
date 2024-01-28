@@ -47,7 +47,7 @@ async def main() -> None:
                     Coordinate(
                         latitude=Latitude(35.6897), longitude=Longitude(139.6922)
                     ),
-                    start_date=datetime(2024, 1, 5),
+                    start_date=datetime(2010, 1, 5),
                     end_date=datetime(2024, 1, 15),
                 )
             )
