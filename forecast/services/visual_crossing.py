@@ -29,9 +29,9 @@ class VisualCrossing(Provider):
             '/history',
             params={
                 'aggregateHours': aggregate_hours,
-                'location': f'{coordinate.longitude},{coordinate.latitude}',
-                'start_date': start_date.strftime('%Y-%m-%d'),
-                'end_date': end_date.strftime('%Y-%m-%d'),
+                'location': f'{coordinate.latitude},{coordinate.longitude}',
+                'startDateTime': start_date.isoformat(),
+                'endDateTime': end_date.isoformat(),
                 'contentType': 'json',
                 'key': self.api_key,
             },

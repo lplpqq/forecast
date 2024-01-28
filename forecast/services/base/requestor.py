@@ -1,9 +1,10 @@
 from abc import ABC
 from types import TracebackType
 from typing import Any, Self
+from urllib.parse import urlencode
 
 import aiohttp
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientResponseError
 
 from forecast.logging import logger_provider
 
@@ -63,6 +64,7 @@ class Requestor(ABC):
             path = self.base_endpoint_url + path
 
         async with self._session.request(method, path, **kwargs) as response:
+            response.raise_for_status()
             return await response.json()
 
     async def _get(self, path: str, **kwargs: Any) -> dict[Any, Any]:

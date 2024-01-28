@@ -272,7 +272,8 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
 
                 continue
 
-        logger.info('Prepearing to generate schema from {}')
+        logger.debug(json.dumps(all_results, indent=4))
+        logger.info('Preparing to generate schema from {}')
         for provider_name, data in all_results.items():
             module_name = pascal_case_to_snake_case(provider_name)
             out_file = args.out_dir.joinpath(module_name).with_suffix('.py')
