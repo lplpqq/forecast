@@ -34,8 +34,8 @@ from lib.logging import setup_logging
 logger_provider = setup_logging('generate_schema', Path('./tools.log'))
 logger = logger_provider(__name__)
 
-DEFAULT_PROVIDERS_DIR: Final[Path] = Path('./forecast/services/')
-DEFAULT_OUT_DIR: Final[Path] = Path('./forecast/services/schema')
+DEFAULT_PROVIDERS_DIR: Final[Path] = Path('./forecast/providers/')
+DEFAULT_OUT_DIR: Final[Path] = DEFAULT_PROVIDERS_DIR.joinpath('./schema')
 DEFAULT_CONFIG_PATH: Final[Path] = Path('./config/dev.yaml')
 
 
@@ -92,9 +92,7 @@ def parse_args() -> ToolNamespace:
 
     validate_path(np.providers_dir, 'folder', {'readable'})
     validate_path(np.config_path, 'file', {'readable'})
-    validate_path(
-        np.out_dir, 'folder', {'readable', 'writable'}, autocreate_folder=True
-    )
+    validate_path(np.out_dir, 'folder', {'readable', 'writable'}, autocreate=True)
 
     return np
 

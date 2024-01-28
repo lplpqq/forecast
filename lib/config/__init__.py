@@ -8,6 +8,8 @@ from pydantic import BaseModel
 
 SUPPORTED_EXTENSION: set[str] = set(['yaml', 'json'])
 
+# TODO: Example config generator from real config file, flag param
+
 
 class BaseConfig(BaseModel):
     @classmethod

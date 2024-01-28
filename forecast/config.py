@@ -10,7 +10,7 @@ logger = logger_provider(__name__)
 
 
 class BaseDataSourceConfig(BaseModel):
-    api_key: str
+    api_key: str | None
 
 
 class WeatherBitSourceConfig(BaseDataSourceConfig):
@@ -28,7 +28,12 @@ class VisualCrossingSourceConfig(BaseDataSourceConfig):
 class TomorrowSourceConfig(BaseDataSourceConfig):
     ...
 
+
 class WorldWeatherOnlineSourceConfig(BaseDataSourceConfig):
+    ...
+
+
+class MeteostatSourceConfig(BaseDataSourceConfig):
     ...
 
 
@@ -38,6 +43,7 @@ class SourcesConfig(BaseModel):
     visual_crossing: VisualCrossingSourceConfig
     tomorrow: TomorrowSourceConfig
     world_weather_online: WorldWeatherOnlineSourceConfig
+    meteostat: MeteostatSourceConfig
 
 
 class DBConfig(BaseModel):

@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.109.0"
-aiohttp = "^3.9.1"
+aiohttp = {extras = ["speedups"], version = "^3.9.1"}
 pandas = "^2.2.0"
 numpy = "^1.26.3"
 pydantic = "^2.5.3"
@@ -18,6 +18,10 @@ pyyaml = "^6.0.1"
 sqlalchemy = {extras = ["asyncio", "asyncpg"], version = "^2.0.25"}
 alembic = "^1.13.1"
 asyncpg = "^0.29.0"
+aiofiles = "^23.2.1"
+orjson = "^3.9.12"
+geopy = "^2.4.1"
+scipy = "^1.12.0"
 
 [tool.poetry.group.dev.dependencies]
 isort = "*"
@@ -55,8 +59,10 @@ useLibraryCodeForTypes = true
 reportMissingImports = true
 reportMissingTypeStubs = false
 
+reportUnknownArgumentType = false
 reportUnknownMemberType = false
 reportUnknownVariableType = false
+reportUnknownLambdaType = false
 
 strictListInference = true
 stringDictionaryInference = true

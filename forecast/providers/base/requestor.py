@@ -1,21 +1,37 @@
+import gc
+import gzip
+import json
 from abc import ABC
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Literal, Self, TypeAlias
+from urllib.parse import urlparse
 
 import aiohttp
-from aiohttp import ClientSession
+from aiohttp import ClientResponse, ClientSession
 
 from forecast.logging import logger_provider
 
+MethodType: TypeAlias = Literal['GET', 'POST']
+CompressionType: TypeAlias = Literal['gzip'] | None
+JsonData: TypeAlias = dict[Any, Any]
 
-class Requestor(ABC):
+
+class BaseRequestor(ABC):
     def __init__(
-        self, base_endpoint_url: str, conn: aiohttp.TCPConnector, api_key: str | None
+        self, base_endpoint_url: str, conn: aiohttp.BaseConnector, api_key: str | None
     ) -> None:
         self.logger = logger_provider(__name__)
 
         self.api_key = api_key
-        self.base_endpoint_url = base_endpoint_url
+
+        parsed = urlparse(base_endpoint_url)
+        self._base_url = parsed.scheme + '://' + parsed.netloc
+        self._base_endpoint = parsed.path
+
+        if self._base_endpoint.endswith('/'):
+            self._base_endpoint = self._base_endpoint[:-1]
 
         self._connector = conn
 
@@ -29,7 +45,10 @@ class Requestor(ABC):
             )
             return
 
-        self._session = ClientSession(connector=self._connector)
+        self._session = ClientSession(
+            connector=self._connector, base_url=self._base_url
+        )
+
         self.is_setup = True
 
     async def __aenter__(self) -> Self:
@@ -42,7 +61,9 @@ class Requestor(ABC):
             self.logger.warning('You may not disconnect before even connecting.')
             return
 
-        await self._session.close()
+        # FIXME: Impletement a semaphore, as the session closes the connector as well and others can't use it. https://docs.python.org/3/library/asyncio-sync.html#semaphore
+        # NOTE: https://stackoverflow.com/questions/69513453/aiohttp-clientconnectionerror-connector-is-closed
+        # await self._session.close()
         self.is_setup = False
 
     async def __aexit__(
@@ -53,21 +74,76 @@ class Requestor(ABC):
     ) -> None:
         await self.clean_up()
 
+    def _resolve_endpoint(self, to_add_to_base: str) -> str:
+        if not to_add_to_base.startswith('/'):
+            to_add_to_base = f'/{to_add_to_base}'
+
+        return self._base_endpoint + to_add_to_base
+
+    @asynccontextmanager
     async def _request(
-        self, path: str, *, method: str, **kwargs: Any
-    ) -> dict[Any, Any]:
+        self, method: str, endpoint: str, **kwargs: Any
+    ) -> AsyncIterator[ClientResponse]:
         if self._session is None:
             raise RuntimeError('Session is not established')
 
-        if not path.startswith('https://'):
-            path = self.base_endpoint_url + path
+        endpoint_path_from_base = self._resolve_endpoint(endpoint)
+        full_url = self._base_url + endpoint_path_from_base
 
-        async with self._session.request(method, path, **kwargs) as response:
+        self.logger.info(f'Sending request to "{full_url}"')
+
+        async with self._session.request(
+            method, endpoint_path_from_base, **kwargs
+        ) as response:
+            # TODO: Measure the performance, check if either even logging to debug or a flag in init not to log.
+            self.logger.info(
+                f'Got response from "{full_url}", status: {response.status}'
+            )
+
             response.raise_for_status()
-            return await response.json()
 
-    async def _get(self, path: str, **kwargs: Any) -> dict[Any, Any]:
-        return await self._request(path, method='GET', **kwargs)
+            yield response
 
-    async def _post(self, path: str, **kwargs: Any) -> dict[Any, Any]:
-        return await self._request(path, method='POST', **kwargs)
+
+class Requestor(BaseRequestor):
+    async def _request_json(
+        self, endpoint: str, *, method: MethodType, **kwargs: Any
+    ) -> JsonData:
+        async with self._request(method, endpoint, **kwargs) as response:
+            raw = await response.json()
+
+            self.logger.debug('JSON data:')
+            self.logger.debug(json.dumps(raw, indent=4))
+
+            return raw
+
+    # NOTE: Option for streaming the file in chunks? In that case the compression has to be None or, as far as, I am concered the function calls to gzip or other decompresser is going to be expresive for small chunks... The whole overloading hustle as well as runtime checks.. YAGNI
+    async def _request_file(
+        self,
+        endpoint: str,
+        *,
+        method: MethodType = 'GET',
+        compression: CompressionType = None,
+        **kwargs: Any,
+    ) -> bytes:
+        async with self._request(method, endpoint, **kwargs) as response:
+            contents = await response.read()
+            self.logger.debug(f'File contents size: approx. {len(contents)} bytes')
+
+            if compression is None:
+                return contents
+
+            match compression:
+                case 'gzip':
+                    decompressed = gzip.decompress(contents)
+
+            del contents
+            gc.collect(generation=0)
+
+            return decompressed
+
+    async def _get(self, path: str, **kwargs: Any) -> JsonData:
+        return await self._request_json(path, method='GET', **kwargs)
+
+    async def _post(self, path: str, **kwargs: Any) -> JsonData:
+        return await self._request_json(path, method='POST', **kwargs)

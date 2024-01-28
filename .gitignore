@@ -1,6 +1,8 @@
 /config/dev.yaml
 /config/test.yaml
 
+/.cache
+
 /**/__pycache__
 /**/.pytest_cache
 /.ruff_cache

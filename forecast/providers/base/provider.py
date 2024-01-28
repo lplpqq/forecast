@@ -14,8 +14,8 @@ HistoricalWeather: TypeAlias = dict[Any, Any] | BaseModel
 
 class Provider(Requestor):
     @abstractmethod
-    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None = None) -> None:
-        ...
+    def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None = None) -> None:
+        super().__init__(conn, api_key)
 
     @abstractmethod
     async def get_historical_weather(

@@ -13,12 +13,15 @@ ACCESS_MODE_TO_CODE: dict[AccessMode, int] = {
     'executable': os.X_OK,
 }
 
+# TODO: Consider migration to async API, all of the other code is async as well
+
 
 def validate_path(
     path: Path,
     type_: Literal['file', 'folder'],
     access_modes_to_check: set[AccessMode] | None = None,
-    autocreate_folder: bool = False,
+    *,
+    autocreate: bool = False,
     autocreate_is_recursive: bool = True,
 ) -> None:
     if access_modes_to_check is None:
@@ -26,8 +29,15 @@ def validate_path(
 
     formatted_path = format_path(path)
     if not path.exists():
-        if type_ == 'folder' and autocreate_folder:
-            path.mkdir(parents=autocreate_is_recursive)
+        if autocreate:
+            match type_:
+                case 'folder':
+                    path.mkdir(parents=autocreate_is_recursive)
+                case 'file':
+                    if not path.parent.exists():
+                        path.parent.mkdir(parents=autocreate_is_recursive)
+
+                    path.touch()
         else:
             raise ValueError(
                 f'{type_.capitalize()} at "{formatted_path}" doesn\'t exit'

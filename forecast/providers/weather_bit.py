@@ -6,7 +6,8 @@ from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
 from forecast.providers.base import Provider
-#from forecast.providers.schema.weather_bit import WeatherBitSchema
+
+# from forecast.providers.schema.weather_bit import WeatherBitSchema
 
 
 GRANULARITY_TO_STRING: dict[Granularity, Literal['hourly', 'daily']] = {
@@ -25,7 +26,7 @@ class WeatherBit(Provider):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ):# -> WeatherBitSchema:
+    ):  # -> WeatherBitSchema:
         granularity_string = GRANULARITY_TO_STRING[granularity]
 
         raw = await self._get(
@@ -39,4 +40,4 @@ class WeatherBit(Provider):
             },
         )
         return raw
-        #return WeatherBitSchema.model_validate(raw)
+        # return WeatherBitSchema.model_validate(raw)

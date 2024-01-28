@@ -4,8 +4,8 @@ scrap all info and put into database
 from datetime import datetime
 from typing import Any
 
-from pydantic_extra_types.coordinate import Coordinate
 from providers.base import Provider
+from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.enums import Granularity
 
