@@ -1,10 +1,9 @@
 from abc import ABC
 from types import TracebackType
 from typing import Any, Self
-from urllib.parse import urlencode
 
 import aiohttp
-from aiohttp import ClientSession, ClientResponseError
+from aiohttp import ClientSession
 
 from forecast.logging import logger_provider
 

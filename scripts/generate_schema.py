@@ -173,8 +173,11 @@ async def orchestrate_providers(
     providers: list[Provider],
 ) -> AsyncIterator[list[Provider]]:
     await asyncio.gather(*[provider.setup() for provider in providers])
-    yield providers
-    await asyncio.gather(*[provider.clean_up() for provider in providers])
+
+    try:
+        yield providers
+    finally:
+        await asyncio.gather(*[provider.clean_up() for provider in providers])
 
 
 FetchTask: TypeAlias = asyncio.Task[HistoricalWeather | None]
@@ -272,8 +275,7 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
 
                 continue
 
-        logger.debug(json.dumps(all_results, indent=4))
-        logger.info('Preparing to generate schema from {}')
+        logger.info('Prepearing to generate schema from {}')
         for provider_name, data in all_results.items():
             module_name = pascal_case_to_snake_case(provider_name)
             out_file = args.out_dir.joinpath(module_name).with_suffix('.py')

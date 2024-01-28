@@ -35,6 +35,6 @@ class Tomorrow(Provider):
                 'startTime': start_date.isoformat(),
                 'endTime': end_date.isoformat(),
                 'units': 'metric',
-                'location': f'{coordinate.longitude}, {coordinate.latitude}'
+                'location': f'{coordinate.longitude}, {coordinate.latitude}',
             },
         )
