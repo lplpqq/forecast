@@ -20,7 +20,10 @@ JsonData: TypeAlias = dict[Any, Any]
 
 class BaseRequestor(ABC):
     def __init__(
-        self, base_endpoint_url: str, conn: aiohttp.BaseConnector, api_key: str | None
+        self,
+        base_endpoint_url: str,
+        conn: aiohttp.BaseConnector,
+        api_key: str | None = None,
     ) -> None:
         self.logger = logger_provider(__name__)
 
@@ -141,6 +144,19 @@ class Requestor(BaseRequestor):
             gc.collect(generation=0)
 
             return decompressed
+
+    async def get_file(
+        self,
+        endpoint: str,
+        *,
+        compression: CompressionType = None,
+        **kwargs: Any,
+    ) -> bytes:
+        data = await self._request_file(
+            endpoint, method='GET', compression=compression, **kwargs
+        )
+
+        return data
 
     async def _get(self, path: str, **kwargs: Any) -> JsonData:
         return await self._request_json(path, method='GET', **kwargs)

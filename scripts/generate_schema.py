@@ -92,7 +92,7 @@ def parse_args() -> ToolNamespace:
 
     validate_path(np.providers_dir, 'folder', {'readable'})
     validate_path(np.config_path, 'file', {'readable'})
-    validate_path(np.out_dir, 'folder', {'readable', 'writable'}, autocreate=True)
+    validate_path(np.out_dir, 'folder', {'readable', 'writable'}, autocreate_self=True)
 
     return np
 

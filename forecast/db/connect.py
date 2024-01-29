@@ -11,7 +11,7 @@ from forecast.config import Config
 def create_engine(from_config: Config) -> AsyncEngine:
     engine = create_async_engine(
         from_config.db.connection_string,
-        echo=True,
+        echo=False,
     )
 
     return engine

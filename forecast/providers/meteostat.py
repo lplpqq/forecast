@@ -17,7 +17,6 @@ import numpy as np
 import numpy.typing as npt
 import orjson
 import pandas as pd
-from geopy.distance import geodesic
 from pydantic_extra_types.coordinate import Coordinate
 from scipy.spatial import distance
 
@@ -36,7 +35,6 @@ def years_from_range(start: datetime, end: datetime) -> list[int]:
 
 
 FloatsArray: TypeAlias = npt.NDArray[np.float64]
-DistanceComputeMethod: TypeAlias = Literal['euclidean', 'geodesic']
 
 StationId = NewType('StationId', str)
 CacheKey: TypeAlias = tuple[StationId, int]
@@ -111,7 +109,7 @@ class Meteostat(Provider):
         validate_path(
             self._stations_cache_file,
             'file',
-            autocreate=True,
+            autocreate_self=True,
             autocreate_is_recursive=True,
         )
 
@@ -130,12 +128,12 @@ class Meteostat(Provider):
                 STATIONS_CACHE_FOLDER,
                 'folder',
                 {'readable', 'writable'},
-                autocreate=True,
+                autocreate_self=True,
                 autocreate_is_recursive=True,
             )
 
             self.logger.info('Fetching the stations list')
-            decompressed_file = await self._request_file(
+            decompressed_file = await self.request_file(
                 '/stations/lite.json.gz', compression='gzip'
             )
 
@@ -180,32 +178,18 @@ class Meteostat(Provider):
             FloatsArray, self._stations_df[['latitude', 'longitude']].values
         )
 
-    def _find_nearest_station(
-        self,
-        point: Coordinate,
-        distance_compute_method: DistanceComputeMethod = 'euclidean',
-    ) -> tuple[StationId, float]:
+    def _find_nearest_station(self, point: Coordinate) -> tuple[StationId, float]:
         if self._stations_df is None or self._stations_coordinates is None:
             raise ValueError('You need to call .setup() first to prime the data.')
 
-        def geodesic_dinstance(a: FloatsArray, b: FloatsArray) -> float:
-            return geodesic(a, b).km  # pyright: ignore
-
-        metric = (
-            'euclidean'
-            if distance_compute_method == 'euclidean'
-            else geodesic_dinstance
-        )
         start = time.perf_counter()
         closest = distance.cdist(
-            [(point.latitude, point.longitude)],
-            self._stations_coordinates,
-            metric=metric,
+            [(point.latitude, point.longitude)], self._stations_coordinates
         )
+        end = time.perf_counter()
 
         index = closest.argmin()
         distances = closest[0]
-        end = time.perf_counter()
 
         self.logger.debug(
             f'Took: {end - start} to compute the closest point with {self._stations_coordinates.shape[0]} points'
@@ -219,7 +203,7 @@ class Meteostat(Provider):
     ) -> str:
         path = f'/{GRANULARITY_TO_STRING[granularity]}/'
 
-        if granularity == Granularity.HOUR and year:
+        if granularity is Granularity.HOUR and year:
             path += f'{year}/'
 
         return f'{path}{station}.csv.gz'
@@ -228,7 +212,7 @@ class Meteostat(Provider):
         self, granularity: Granularity, station_id: StationId, year: int, index: int
     ) -> tuple[int, bytes]:
         endpoint = self._generate_endpoint_path(granularity, station_id, year)
-        compressed_data = await self._request_file(endpoint, compression=None)
+        compressed_data = await self.request_file(endpoint, compression=None)
 
         return index, compressed_data
 
@@ -289,7 +273,7 @@ class Meteostat(Provider):
         end_date: datetime,
     ) -> Any:
         # NOTE: Maybe cache?
-        nearest_station, distance = self._find_nearest_station(coordinate, 'euclidean')
+        nearest_station, distance = self._find_nearest_station(coordinate)
 
         self.logger.debug(
             f'Nearest station for {coordinate} is {nearest_station} ({distance} km)'

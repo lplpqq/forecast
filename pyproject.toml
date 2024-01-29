@@ -23,6 +23,8 @@ orjson = "^3.9.12"
 geopy = "^2.4.1"
 scipy = "^1.12.0"
 pyright = "^1.1.349"
+geoalchemy2 = "^0.14.3"
+pyarrow = "^15.0.0"
 
 [tool.poetry.group.dev.dependencies]
 isort = "*"

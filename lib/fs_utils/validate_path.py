@@ -21,7 +21,8 @@ def validate_path(
     type_: Literal['file', 'folder'],
     access_modes_to_check: set[AccessMode] | None = None,
     *,
-    autocreate: bool = False,
+    autocreate_self: bool = False,
+    autocreate_only_parent: bool = False,
     autocreate_is_recursive: bool = True,
 ) -> None:
     if access_modes_to_check is None:
@@ -29,15 +30,18 @@ def validate_path(
 
     formatted_path = format_path(path)
     if not path.exists():
-        if autocreate:
+        if autocreate_self or autocreate_only_parent:
             match type_:
                 case 'folder':
-                    path.mkdir(parents=autocreate_is_recursive)
+                    to_create = path.parent if autocreate_only_parent else path
+                    to_create.mkdir(parents=autocreate_is_recursive, exist_ok=True)
                 case 'file':
-                    if not path.parent.exists():
-                        path.parent.mkdir(parents=autocreate_is_recursive)
+                    path.parent.mkdir(parents=autocreate_is_recursive, exist_ok=True)
+                    if not autocreate_only_parent:
+                        path.touch(exist_ok=True)
 
-                    path.touch()
+            if autocreate_only_parent:
+                path = path.parent
         else:
             raise ValueError(
                 f'{type_.capitalize()} at "{formatted_path}" doesn\'t exit'
@@ -50,7 +54,7 @@ def validate_path(
                     f'Path: "{formatted_path}" has to point to a directory'
                 )
         case 'file':
-            if not path.is_file():
+            if not path.is_file() and not (autocreate_only_parent and path.is_dir()):
                 raise ValueError(f'Path: "{formatted_path}" has to point to a file')
 
     for access_mode in access_modes_to_check:
