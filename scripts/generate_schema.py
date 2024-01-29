@@ -1,7 +1,6 @@
 import asyncio
 import importlib.util
 import inspect
-import json
 import os
 import os.path
 import re
@@ -15,6 +14,7 @@ from types import ModuleType
 from typing import Final, TypeAlias
 
 import aiohttp
+import orjson
 import uvloop
 from datamodel_code_generator import (
     DataModelType,
@@ -168,6 +168,7 @@ def pascal_case_to_snake_case(identifier: str) -> str:
 
 @asynccontextmanager
 async def orchestrate_providers(
+    connector: aiohttp.BaseConnector,
     providers: list[Provider],
 ) -> AsyncIterator[list[Provider]]:
     await asyncio.gather(*[provider.setup() for provider in providers])
@@ -176,12 +177,13 @@ async def orchestrate_providers(
         yield providers
     finally:
         await asyncio.gather(*[provider.clean_up() for provider in providers])
+        await connector.close()
 
 
 FetchTask: TypeAlias = asyncio.Task[HistoricalWeather | None]
 
 
-async def fetch_task_func(provider: Provider) -> HistoricalWeather:
+async def fetch_task_func(provider: Provider) -> HistoricalWeather | None:
     if not provider.is_setup:
         await provider.setup()
 
@@ -233,16 +235,16 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
         if e is not None:
             logger.error(e)
 
-    async with orchestrate_providers(providers) as providers:
+    provider_names: list[str] = []
+    async with orchestrate_providers(connector, providers) as providers:
         fetch_tasks: list[FetchTask] = []
-        working_providers: list[Provider] = []
         for provider in providers:
             fetch_task: FetchTask | None = None
             try:
                 fetch_task = event_loop.create_task(fetch_task_func(provider))
 
                 fetch_tasks.append(fetch_task)
-                working_providers.append(provider)
+                provider_names.append(provider.__class__.__name__)
             except Exception as e:
                 if fetch_task is not None:
                     fetch_task.set_result(None)
@@ -251,30 +253,35 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
 
                 continue
 
-        done, _ = await asyncio.wait(fetch_tasks)
+        done = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
         all_results: dict[str, HistoricalWeather] = {}
-        for task, provider in zip(done, working_providers):
-            provider_class_name = provider.__class__.__name__
-
+        for data_or_exc, provider_name in zip(done, provider_names):
             try:
-                data = task.result()
-                if data is None:
-                    log_could_not_get(provider_class_name)
+                if isinstance(data_or_exc, BaseException):
+                    log_could_not_get(provider_name, data_or_exc)
+
                     continue
 
-                all_results[provider_class_name] = data
+                if data_or_exc is None:
+                    log_could_not_get(provider_name)
+                    continue
+
+                all_results[provider_name] = data_or_exc
             except Exception as e:
-                log_could_not_get(provider_class_name, e)
-                logger.error(
-                    f'Error retrieving data after the request for {provider_class_name}, skipping scheme generation for it. See the error:'
-                )
-                logger.error(e)
+                # It seesms that the variable is changed by the time the iterpreter gets here. I don't really know
+                log_could_not_get('<unknown>', e)
 
                 continue
 
         logger.info('Preparing to generate schema from {}')
         for provider_name, data in all_results.items():
+            if not isinstance(data, dict):
+                logger.info(
+                    f'Data from provider {provider_name} is of type {type(data)} and not a dictionary resembling json, skipping the codegen for the provider.'
+                )
+                continue
+
             module_name = pascal_case_to_snake_case(provider_name)
             out_file = args.out_dir.joinpath(module_name).with_suffix('.py')
 
@@ -290,12 +297,14 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
                     )
                     out_file.unlink()
 
+            json_string = orjson.dumps(data).decode('utf-8')
             generate(
-                json.dumps(data),
+                json_string,
                 class_name=f'{provider_name}Schema',
                 input_file_type=InputFileType.Json,
                 target_python_version=PythonVersion.PY_311,
                 output=out_file,
+                snake_case_field=True,
                 output_model_type=DataModelType.PydanticV2BaseModel,
             )
 

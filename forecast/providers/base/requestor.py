@@ -90,7 +90,7 @@ class BaseRequestor(ABC):
         endpoint_path_from_base = self._resolve_endpoint(endpoint)
         full_url = self._base_url + endpoint_path_from_base
 
-        self.logger.info(f'Sending request to "{full_url}"')
+        self.logger.info(f'Sending a {method} request to "{full_url}"')
 
         async with self._session.request(
             method, endpoint_path_from_base, **kwargs

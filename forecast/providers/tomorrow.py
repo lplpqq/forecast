@@ -18,6 +18,7 @@ class Tomorrow(Provider):
         start_date: datetime,
         end_date: datetime,
     ):
+        # * https://docs.tomorrow.io/reference/historical
         return await self._post(
             '/historical',
             params={
@@ -27,6 +28,17 @@ class Tomorrow(Provider):
                 'timesteps': [f'{granularity.value}h'],
                 'startTime': start_date.isoformat(),
                 'endTime': end_date.isoformat(),
+                'fields': [
+                    'temperature',
+                    'humidity',
+                    'windSpeed',
+                    'windDirection',
+                    'windGust',
+                    'pressureSurfaceLevel',
+                    'precipitationAccumulation',
+                    'snowAccumulation',
+                    'cloudCover',
+                ],
                 'units': 'metric',
                 'location': f'{coordinate.longitude}, {coordinate.latitude}',
             },

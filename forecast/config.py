@@ -37,6 +37,10 @@ class MeteostatSourceConfig(BaseDataSourceConfig):
     ...
 
 
+class OpenMeteoSourceConfig(BaseDataSourceConfig):
+    ...
+
+
 class SourcesConfig(BaseModel):
     weather_bit: WeatherBitSourceConfig
     open_weather_map: OpenWeartherMapSourceConfig
@@ -44,6 +48,7 @@ class SourcesConfig(BaseModel):
     tomorrow: TomorrowSourceConfig
     world_weather_online: WorldWeatherOnlineSourceConfig
     meteostat: MeteostatSourceConfig
+    open_meteo: OpenMeteoSourceConfig
 
 
 class DBConfig(BaseModel):

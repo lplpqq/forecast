@@ -1,9 +1,17 @@
 data_sources:
-  weatherbit:
+  weather_bit:
     api_key: "your_api_key"
   open_weather_map:
     api_key: "your_api_key"
   visual_crossing:
     api_key: "your_api_key"
+  open_meteo:
+    api_key: null
+  tomorrow:
+    api_key: "your_api_key"
+  world_weather_online:
+    api_key: "your_api_key"
+  meteostat:
+    api_key: null
 db:
   connection_string: "your_postgres_connection_string"
