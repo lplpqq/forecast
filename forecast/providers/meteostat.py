@@ -20,11 +20,10 @@ import pandas as pd
 from pydantic_extra_types.coordinate import Coordinate
 from scipy.spatial import distance
 
-from forecast.providers.enums import Granularity
+from forecast.enums import Granularity
 from forecast.providers.base import Provider
 from lib.caching.lru_cache import LRUCache
 from lib.fs_utils import format_path, validate_path
-
 
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
@@ -134,7 +133,7 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            decompressed_file = await self._request_file(
+            decompressed_file = await self.request_file(
                 '/stations/lite.json.gz', compression='gzip'
             )
 
@@ -213,7 +212,7 @@ class Meteostat(Provider):
         self, granularity: Granularity, station_id: StationId, year: int, index: int
     ) -> tuple[int, bytes]:
         endpoint = self._generate_endpoint_path(granularity, station_id, year)
-        compressed_data = await self.request_file(endpoint, compression=None)
+        compressed_data = await self._request_file(endpoint, compression=None)
 
         return index, compressed_data
 
@@ -246,22 +245,20 @@ class Meteostat(Provider):
 
             fetch_tasks.append(fetch_task)
 
-        if len(fetch_tasks) != 0:
-            per_year_tasks, _ = await asyncio.wait(fetch_tasks)
-            per_year_data = [task.result() for task in per_year_tasks]
+        per_year_data = await asyncio.gather(*fetch_tasks)
 
-            start = time.perf_counter()
-            results_iter = map(parse_year_data, per_year_data)
-            results = list(results_iter)
-            end = time.perf_counter()
+        start = time.perf_counter()
+        results_iter = map(parse_year_data, per_year_data)
+        results = list(results_iter)
+        end = time.perf_counter()
 
-            self.logger.debug(
-                f'Took to parse {len(results)} CSV file(s): {end - start}'
-            )
+        self.logger.debug(
+            f'Took to parse {len(results)} CSV file(s): {end - start}'
+        )
 
-            for year, (index, data) in zip(years_range, results):
-                self._hourly_cache[(station_id, year)] = data
-                combined_results[index] = data
+        for year, (index, data) in zip(years_range, results):
+            self._hourly_cache[(station_id, year)] = data
+            combined_results[index] = data
 
         concatednated_df = pd.concat(combined_results)
         return concatednated_df
