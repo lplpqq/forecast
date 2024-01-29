@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import typing
 
-from geoalchemy2.types import Geography
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.properties import ForeignKey
 
@@ -18,9 +17,8 @@ class Location(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    point: Mapped[Geography] = mapped_column(
-        Geography(geometry_type='POINT', srid=4326)
-    )
+    latidute: Mapped[float] = mapped_column()
+    longitude: Mapped[float] = mapped_column()
 
     city_id: Mapped[int] = mapped_column(ForeignKey('city.id'))
     city: Mapped[City] = relationship(back_populates='locations')

@@ -3,7 +3,6 @@ from __future__ import annotations
 import typing
 from typing import NamedTuple, Self
 
-from geoalchemy2.types import Geography
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from forecast.models.base import Base
@@ -30,12 +29,14 @@ class City(Base):
     __tablename__ = 'city'
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    source_list_id: Mapped[int] = mapped_column(unique=True)
 
     name: Mapped[str] = mapped_column()
     name_ascii: Mapped[str] = mapped_column()
-    center_location: Mapped[Geography] = mapped_column(
-        Geography(geometry_type='POINT', srid=4326)
-    )
+
+    latitude: Mapped[float] = mapped_column()
+    longitude: Mapped[float] = mapped_column()
+
     country_name: Mapped[str] = mapped_column()
 
     iso_code_two: Mapped[str] = mapped_column()
@@ -48,9 +49,11 @@ class City(Base):
     @classmethod
     def from_city_named_tuple(cls, data: CityTuple) -> Self:
         new_city = cls(
+            source_list_id=data.id,
             name=data.city,
             name_ascii=data.city_ascii,
-            center_location=f'POINT({data.lat} {data.lng})',
+            latitude=data.lat,
+            longitude=data.lng,
             country_name=data.country,
             iso_code_two=data.iso2,
             iso_code_three=data.iso3,

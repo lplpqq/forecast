@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import typing
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey
@@ -8,9 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from forecast.models.base import Base
 from forecast.models.location import Location
-
-if typing.TYPE_CHECKING:
-    from forecast.models.historical_hourly_weather import HistoricalHourlyWeather
 
 
 class HistoricalHourlyWeather(Base):

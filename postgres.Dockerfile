@@ -1,1 +1,1 @@
-FROM kartoza/postgis:15
+FROM postgres:15
