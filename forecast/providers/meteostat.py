@@ -64,8 +64,7 @@ GRANULARITY_TO_STRING: Final[dict[Granularity, Literal['hourly', 'daily']]] = {
 # 12	tsun	The one hour sunshine total in minutes (m)	Integer
 # 13	coco	The weather condition code	Integer
 
-DEFAULT_CSV_NAMES = list(
-    (
+DEFAULT_CSV_NAMES = (
         'date',
         'hour',
         'temp',
@@ -79,7 +78,6 @@ DEFAULT_CSV_NAMES = list(
         'pres',
         'tsun',
         'coco',
-    )
 )
 
 
@@ -93,9 +91,18 @@ def parse_year_data(task_result: tuple[int, bytes]) -> tuple[int, pd.DataFrame]:
     return index, df
 
 
-class Meteostat(Provider):
-    _stations_cache_file: Path
+def _generate_endpoint_path(
+        granularity: Granularity, station: str, year: int | None = None
+) -> str:
+    path = f'/{GRANULARITY_TO_STRING[granularity]}/'
 
+    if granularity is Granularity.HOUR and year:
+        path += f'{year}/'
+
+    return f'{path}{station}.csv.gz'
+
+
+class Meteostat(Provider):
     def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None = None) -> None:
         super(Provider, self).__init__('https://bulk.meteostat.net/v2', conn, api_key)
 
@@ -105,11 +112,11 @@ class Meteostat(Provider):
         self._stations_df: None | pd.DataFrame = None
         self._stations_coordinates: None | FloatsArray = None
 
-        self._freshly_created = not self._stations_cache_file.exists()
         validate_path(
             self._stations_cache_file,
             'file',
-            autocreate_self=True,
+            autocreate_self=False,
+            autocreate_only_parent=True,
             autocreate_is_recursive=True,
         )
 
@@ -119,7 +126,17 @@ class Meteostat(Provider):
         # TODO: Consider storing this data, which is UNIQUE to meteostat in a separate db table not to load this file every time
         await super().setup()
 
-        if not self._stations_cache_file.exists() or self._freshly_created:
+        if self._stations_cache_file.exists():
+            self.logger.info(
+                f'Found cached stations list file, loading from "{format_path(self._stations_cache_file)}"'
+            )
+
+            with open(self._stations_cache_file, encoding='utf-8') as file:
+                content = file.read()
+
+            if len(content) == 0:
+                raise ValueError('Cached file is empty')
+        else:
             self.logger.info(
                 f'Could not find stations list file cached at "{self._stations_cache_file}", fetching and saving'
             )
@@ -133,27 +150,18 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            decompressed_file = await self.request_file(
+            decompressed_file = await self._request_file(
                 '/stations/lite.json.gz', compression='gzip'
             )
 
-            file_contents = decompressed_file.decode('utf-8')
-            if len(file_contents) == 0:
+            content = decompressed_file.decode('utf-8')
+            if len(content) == 0:
                 raise ValueError('Nothing got returned from the API')
 
-            async with aiofiles.open(self._stations_cache_file, 'w+') as handle:
-                await handle.write(file_contents)
-        else:
-            self.logger.info(
-                f'Found cached stations list file, loading from "{format_path(self._stations_cache_file)}"'
-            )
-            async with aiofiles.open(self._stations_cache_file) as handle:
-                file_contents = await handle.read()
+            with open(self._stations_cache_file, 'w+', encoding='utf-8') as file:
+                file.write(content)
 
-            if len(file_contents) == 0:
-                raise ValueError('Cached file is empty')
-
-        stations = orjson.loads(file_contents)
+        stations = orjson.loads(content)
 
         latitudes: list[float] = []
         longitudes: list[float] = []
@@ -178,47 +186,34 @@ class Meteostat(Provider):
             FloatsArray, self._stations_df[['latitude', 'longitude']].values
         )
 
-    def _find_nearest_station(self, point: Coordinate) -> tuple[StationId, float]:
+    def _find_nearest_station(self, point: Coordinate) -> StationId:
         if self._stations_df is None or self._stations_coordinates is None:
             raise ValueError('You need to call .setup() first to prime the data.')
 
         start = time.perf_counter()
         closest = distance.cdist(
-            [(point.latitude, point.longitude)], self._stations_coordinates
+            np.array([(point.latitude, point.longitude)]),
+            self._stations_coordinates
         )
         end = time.perf_counter()
-
-        index = closest.argmin()
-        distances = closest[0]
 
         self.logger.debug(
             f'Took: {end - start} to compute the closest point with {self._stations_coordinates.shape[0]} points'
         )
 
-        station_id = StationId(self._stations_df.iloc[index]['id'])
-        return station_id, cast(float, distances[index])
-
-    def _generate_endpoint_path(
-        self, granularity: Granularity, station: str, year: int | None = None
-    ) -> str:
-        path = f'/{GRANULARITY_TO_STRING[granularity]}/'
-
-        if granularity is Granularity.HOUR and year:
-            path += f'{year}/'
-
-        return f'{path}{station}.csv.gz'
+        index = closest.argmin()
+        return StationId(self._stations_df.iloc[index]['id'])
 
     async def _fetch_compressed_data_for_year(
         self, granularity: Granularity, station_id: StationId, year: int, index: int
     ) -> tuple[int, bytes]:
-        endpoint = self._generate_endpoint_path(granularity, station_id, year)
+        endpoint = _generate_endpoint_path(granularity, station_id, year)
         compressed_data = await self._request_file(endpoint, compression=None)
 
         return index, compressed_data
 
     async def get_for_station(
         self,
-        granularity: Literal[Granularity.HOUR],
         station_id: StationId,
         start_date: datetime,
         end_date: datetime,
@@ -239,7 +234,7 @@ class Meteostat(Provider):
 
             fetch_task = self._event_loop.create_task(
                 self._fetch_compressed_data_for_year(
-                    granularity, station_id, year, index
+                    Granularity.HOUR, station_id, year, index
                 )
             )
 
@@ -265,20 +260,22 @@ class Meteostat(Provider):
 
     async def get_historical_weather(
         self,
-        granularity: Literal[Granularity.HOUR],
+        granularity: Granularity,
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
     ) -> Any:
+        if granularity is not Granularity.HOUR:
+            raise ValueError(f"Unsupported granularity: {granularity.name}")
         # NOTE: Maybe cache?
-        nearest_station, distance = self._find_nearest_station(coordinate)
+        nearest_station = self._find_nearest_station(coordinate)
 
         self.logger.debug(
             f'Nearest station for {coordinate} is {nearest_station} ({distance} km)'
         )
 
         df = await self.get_for_station(
-            granularity, nearest_station, start_date, end_date
+            nearest_station, start_date, end_date
         )
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
