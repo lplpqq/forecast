@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.enums import Granularity
+from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
+from forecast.providers.models import Weather
 
 
 class WorldWeatherOnline(Provider):
@@ -32,4 +33,23 @@ class WorldWeatherOnline(Provider):
             },
         )
 
-        return raw
+        data = []
+        for day in raw['data']['weather']:
+            day_time = datetime.strptime(day['date'], "%Y-%m-%d")
+            snow = int(float(day["totalSnow_cm"]) * 1000)
+            for hour in day['hourly']:
+                data.append(Weather(
+                    date=day_time + timedelta(hours=int(hour['time']) // 100),
+                    temperature=float(hour["tempC"]),
+                    apparent_temperature=float(hour["FeelsLikeC"]),
+                    pressure=int(hour["pressure"]),
+                    wind_speed=round((float(hour["windspeedKmph"]) / 3.6), 2),  # converts km/h to m/s
+                    wind_gust_speed=round(float(hour["WindGustKmph"]) / 3.6, 2),  # converts km/h to m/s
+                    wind_direction=int(hour["winddirDegree"]),
+                    humidity=int(hour["humidity"]),
+                    clouds=int(hour["cloudcover"]),
+                    precipitation=float(hour["precipMM"]),
+                    snow=snow
+                ))
+
+        return data

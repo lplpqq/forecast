@@ -20,10 +20,11 @@ import pandas as pd
 from pydantic_extra_types.coordinate import Coordinate
 from scipy.spatial import distance
 
-from forecast.enums import Granularity
+from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
 from lib.caching.lru_cache import LRUCache
 from lib.fs_utils import format_path, validate_path
+
 
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
@@ -133,7 +134,7 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            decompressed_file = await self.request_file(
+            decompressed_file = await self._request_file(
                 '/stations/lite.json.gz', compression='gzip'
             )
 
