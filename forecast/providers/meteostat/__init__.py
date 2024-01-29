@@ -90,7 +90,9 @@ def parse_year_data(task_result: tuple[int, bytes]) -> tuple[int, pd.DataFrame]:
     decompressed = gzip.decompress(raw_data).decode('utf-8')
     io_string = io.StringIO(decompressed)
 
-    return index, pd.read_csv(io_string, names=DEFAULT_CSV_NAMES)
+    df = pd.read_csv(io_string, names=DEFAULT_CSV_NAMES, parse_dates=['date'])
+
+    return index, df
 
 
 class Meteostat(Provider):
@@ -296,5 +298,8 @@ class Meteostat(Provider):
         df = await self.get_for_station(
             granularity, nearest_station, start_date, end_date
         )
+
+        mask = (df['date'] >= start_date) & (df['date'] <= end_date)
+        df = df.loc[mask]
 
         return df
