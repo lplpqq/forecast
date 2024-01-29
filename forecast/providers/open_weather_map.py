@@ -4,7 +4,7 @@ from typing import Any
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.enums import Granularity
+from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
 
 GRANULARITY_TO_STRING: dict[Granularity, str] = {

@@ -3,7 +3,7 @@ from datetime import datetime
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.enums import Granularity
+from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
 
 
