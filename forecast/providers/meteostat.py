@@ -265,9 +265,11 @@ class Meteostat(Provider):
         # * Reordering the table columns
         concatednated_df['apparent_temp'] = None
         concatednated_df['clouds'] = None
+        concatednated_df['data_source'] = self.name
 
         concatednated_df = concatednated_df[
             [
+                'data_source',
                 'date',
                 'temp',
                 'apparent_temp',
@@ -308,7 +310,6 @@ class Meteostat(Provider):
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
 
-        df['data_source'] = self.name
 
         data: list[Weather] = []
         for tuple_ in df.itertuples():
