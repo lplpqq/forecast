@@ -4,6 +4,7 @@ import json
 from abc import ABC
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from types import TracebackType
 from typing import Any, Literal, Self, TypeAlias
 from urllib.parse import urlparse
@@ -18,10 +19,11 @@ CompressionType: TypeAlias = Literal['gzip'] | None
 JsonData: TypeAlias = dict[Any, Any]
 
 
-class BaseRequestor(ABC):
+
+class Requestor:
     def __init__(
         self,
-        base_endpoint_url: str,
+        base_url: str,
         conn: aiohttp.BaseConnector,
         api_key: str | None = None,
     ) -> None:
@@ -29,7 +31,7 @@ class BaseRequestor(ABC):
 
         self.api_key = api_key
 
-        parsed = urlparse(base_endpoint_url)
+        parsed = urlparse(base_url)
         self._base_url = parsed.scheme + '://' + parsed.netloc
         self._base_endpoint = parsed.path
 
@@ -39,43 +41,40 @@ class BaseRequestor(ABC):
         self._connector = conn
 
         self._session: ClientSession | None = None
-        self.is_setup = False
 
-    async def setup(self) -> None:
-        if self.is_setup:
-            self.logger.warning(
-                'Requestor is already setup, no need to class .setup() twice.'
-            )
-            return
+    # note we do not need to set it up as we pass connector, which means we got to close connector from where we passed it, not ClientSession from here
 
-        self._session = ClientSession(
-            connector=self._connector, base_url=self._base_url
-        )
+    # async def __aenter__(self) -> Self:
+    #     await self.setup()
+    #     return self
+    #
+    # async def __aexit__(
+    #     self,
+    #     exc_type: type[BaseException],
+    #     exc_value: BaseException,
+    #     traceback: TracebackType,
+    # ) -> None:
+    #     await self.clean_up()
+    #
+    # async def setup(self) -> None:
+    #     if self.is_setup:
+    #         self.logger.warning(
+    #             'Requestor is already setup, no need to class .setup() twice.'
+    #         )
+    #         return
+    #
+    #     self._session = ClientSession(
+    #         connector=self._connector, base_url=self._base_url
+    #     )
+    #     self.is_setup = True
+    #
+    # async def clean_up(self) -> None:
+    #     if self._session is None:
+    #         self.logger.warning('You may not disconnect before even connecting.')
+    #         return
+    #     self.is_setup = False
 
-        self.is_setup = True
 
-    async def __aenter__(self) -> Self:
-        await self.setup()
-
-        return self
-
-    async def clean_up(self) -> None:
-        if self._session is None:
-            self.logger.warning('You may not disconnect before even connecting.')
-            return
-
-        # FIXME: Impletement a semaphore, as the session closes the connector as well and others can't use it. https://docs.python.org/3/library/asyncio-sync.html#semaphore
-        # NOTE: https://stackoverflow.com/questions/69513453/aiohttp-clientconnectionerror-connector-is-closed
-        # await self._session.close()
-        self.is_setup = False
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException],
-        exc_value: BaseException,
-        traceback: TracebackType,
-    ) -> None:
-        await self.clean_up()
 
     def _resolve_endpoint(self, to_add_to_base: str) -> str:
         if not to_add_to_base.startswith('/'):
@@ -88,27 +87,27 @@ class BaseRequestor(ABC):
         self, method: str, endpoint: str, **kwargs: Any
     ) -> AsyncIterator[ClientResponse]:
         if self._session is None:
-            raise RuntimeError('Session is not established')
+            self._session = ClientSession(connector=self._connector, base_url=self._base_url)
+            # raise RuntimeError('Session is not established')
 
         endpoint_path_from_base = self._resolve_endpoint(endpoint)
         full_url = self._base_url + endpoint_path_from_base
 
         self.logger.info(f'Sending a {method} request to "{full_url}"')
+        start_time = datetime.now()
 
         async with self._session.request(
             method, endpoint_path_from_base, **kwargs
         ) as response:
-            # TODO: Measure the performance, check if either even logging to debug or a flag in init not to log.
+            end_time = datetime.now()
             self.logger.info(
-                f'Got response from "{full_url}", status: {response.status}'
+                f'[Time taken - {end_time - start_time}] Got response from "{full_url}", status: {response.status}'
             )
 
             response.raise_for_status()
 
             yield response
 
-
-class Requestor(BaseRequestor):
     async def _request_json(
         self, endpoint: str, *, method: MethodType, **kwargs: Any
     ) -> JsonData:
@@ -152,14 +151,10 @@ class Requestor(BaseRequestor):
         compression: CompressionType = None,
         **kwargs: Any,
     ) -> bytes:
-        data = await self._request_file(
-            endpoint, method='GET', compression=compression, **kwargs
-        )
+        return await self._request_file(endpoint, method='GET', compression=compression, **kwargs)
 
-        return data
-
-    async def _get(self, path: str, **kwargs: Any) -> JsonData:
+    async def get(self, path: str, **kwargs: Any) -> JsonData:
         return await self._request_json(path, method='GET', **kwargs)
 
-    async def _post(self, path: str, **kwargs: Any) -> JsonData:
+    async def post(self, path: str, **kwargs: Any) -> JsonData:
         return await self._request_json(path, method='POST', **kwargs)

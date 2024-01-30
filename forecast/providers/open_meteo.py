@@ -6,12 +6,18 @@ from pydantic_extra_types.coordinate import Coordinate
 from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
 from forecast.providers.models.weather import Weather
+from forecast.requestor import Requestor
 
 
 class OpenMeteo(Provider):
-    def __init__(self, conn: aiohttp.TCPConnector) -> None:
-        super(Provider, self).__init__(
-            'https://archive-api.open-meteo.com/v1', conn
+    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
+        self._api_key = api_key
+        self._base_url = 'https://archive-api.open-meteo.com/v1'
+
+        self._requestor = Requestor(
+            base_url=self._base_url,
+            conn=conn,
+            api_key=self._api_key
         )
 
     async def get_historical_weather(
@@ -28,7 +34,7 @@ class OpenMeteo(Provider):
         else:
             raise ValueError(...)
 
-        raw = await self._get(
+        raw = await self._requestor.get(
             '/archive',
             params={
                 'latitude': coordinate.latitude,
@@ -82,3 +88,11 @@ class OpenMeteo(Provider):
                 #description=''
             ))
         return data
+
+    @property
+    def api_key(self) -> str | None:
+        return self._api_key
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url

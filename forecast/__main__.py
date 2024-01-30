@@ -9,12 +9,14 @@ from forecast.providers.enums import Granularity
 from forecast.logging import logger_provider
 from forecast.providers import WeatherBit, OpenMeteo, WorldWeatherOnline, Tomorrow, OpenWeatherMap, VisualCrossing
 from forecast.providers.meteostat import Meteostat
+from forecast.config import config
 
 logger = logger_provider(__name__)
 
 
 async def main() -> None:
     logger.info('Starting')
+    start_time = datetime.now()
 
     async with TCPConnector() as connector:
         location = Coordinate(
@@ -26,9 +28,7 @@ async def main() -> None:
             )
         )
 
-
-        world_weather = WorldWeatherOnline(connector, "c6b25e7a6c8046db9a3133035242801")
-        await world_weather.setup()
+        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
         world_weather_data = await world_weather.get_historical_weather(
             Granularity.HOUR,
             location,
@@ -36,8 +36,8 @@ async def main() -> None:
             end_date=datetime(2024, 1, 15)
         )
 
-        meteostat = Meteostat(connector, '3bc5d56a89f247758f55c4023ad95035')
-        await meteostat.setup()
+        meteostat = Meteostat(connector, config.data_sources.meteostat.api_key)
+        await meteostat.setup()  # meteostat is the only class that requires setup, as it calls setup of exactly Meteostat class, but not setup of Requestor class
         meteostat_data = await meteostat.get_historical_weather(
             Granularity.HOUR,
             Coordinate(
@@ -47,8 +47,7 @@ async def main() -> None:
             end_date=datetime(2024, 1, 15),
         )
 
-        # weatherbit = WeatherBit(connector, '3bc5d56a89f247758f55c4023ad95035')
-        # await weatherbit.setup()
+        # weatherbit = WeatherBit(connector, config.data_sources.weather_bit.api_key)
         # weatherbit_data = await weatherbit.get_historical_weather(
         #     Granularity.HOUR,
         #     location,
@@ -56,8 +55,7 @@ async def main() -> None:
         #     end_date=datetime(2024, 1, 15)
         # )
 
-        openmeteo = OpenMeteo(connector)
-        await openmeteo.setup()
+        openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         openmeteo_data = await openmeteo.get_historical_weather(
             Granularity.HOUR,
             location,
@@ -66,23 +64,14 @@ async def main() -> None:
         )
 
         # tomorrow = Tomorrow(connector, config.data_sources.tomorrow.api_key)
-        # await tomorrow.setup()
         # tomorrow_data = await tomorrow.get_historical_weather(
         #     Granularity.HOUR,
-        #     Coordinate(
-        #         latitude=Latitude(
-        #             35.6897
-        #         ),
-        #         longitude=Longitude(
-        #             139.6922
-        #         )
-        #     ),
+        #     location,
         #     start_date=datetime(2024, 1, 5),
         #     end_date=datetime(2024, 1, 15)
         # )
 
         # openweathermap = OpenWeatherMap(connector, config.data_sources.open_weather_map.api_key)
-        # await openweathermap.setup()
         # openweathermap_data = await openweathermap.get_historical_weather(
         #     Granularity.HOUR,
         #     location,
@@ -91,7 +80,6 @@ async def main() -> None:
         # )
 
         # visualcrossing = VisualCrossing(connector, config.data_sources.visual_crossing.api_key)
-        # await visualcrossing.setup()
         # visualcrossing_data = await visualcrossing.get_historical_weather(
         #     Granularity.HOUR,
         #     location,
@@ -114,6 +102,8 @@ async def main() -> None:
             # print(openweathermap_)
             # print(visualcrossing_)
             print()
+    end_time = datetime.now()
+    logger.info(f'Time taken - {end_time - start_time}')
 
 
 def get_loop_factory() -> asyncio.AbstractEventLoop | None:

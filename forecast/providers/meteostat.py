@@ -19,10 +19,12 @@ import pandas as pd
 from pydantic_extra_types.coordinate import Coordinate
 from scipy.spatial import distance
 
+from forecast.logging import logger_provider
 from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
 from lib.caching.lru_cache import LRUCache
 from lib.fs_utils import format_path, validate_path
+from forecast.requestor import Requestor
 
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
@@ -103,8 +105,16 @@ def _generate_endpoint_path(
 
 class Meteostat(Provider):
     def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None = None) -> None:
-        super(Provider, self).__init__('https://bulk.meteostat.net/v2', conn, api_key)
+        self._api_key = api_key
+        self._base_url = 'https://bulk.meteostat.net/v2'
 
+        self._requestor = Requestor(
+            base_url=self._base_url,
+            conn=conn,
+            api_key=self._api_key
+        )
+
+        self.logger = logger_provider(__name__)
         self._event_loop = asyncio.get_event_loop()
 
         self._stations_cache_file = STATIONS_CACHE_FOLDER.joinpath('./list-lite.json')
@@ -123,8 +133,6 @@ class Meteostat(Provider):
 
     async def setup(self) -> None:
         # TODO: Consider storing this data, which is UNIQUE to meteostat in a separate db table not to load this file every time
-        await super().setup()
-
         if self._stations_cache_file.exists():
             self.logger.info(
                 f'Found cached stations list file, loading from "{format_path(self._stations_cache_file)}"'
@@ -149,7 +157,7 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            decompressed_file = await self._request_file(
+            decompressed_file = await self._requestor.get_file(
                 '/stations/lite.json.gz', compression='gzip'
             )
 
@@ -187,6 +195,7 @@ class Meteostat(Provider):
 
     def _find_nearest_station(self, point: Coordinate) -> StationId:
         if self._stations_df is None or self._stations_coordinates is None:
+            # fixme if you just call self.setup() from here there wont be any purpose of making setup method public
             raise ValueError('You need to call .setup() first to prime the data.')
 
         start = time.perf_counter()
@@ -207,7 +216,7 @@ class Meteostat(Provider):
         self, granularity: Granularity, station_id: StationId, year: int, index: int
     ) -> tuple[int, bytes]:
         endpoint = _generate_endpoint_path(granularity, station_id, year)
-        compressed_data = await self._request_file(endpoint, compression=None)
+        compressed_data = await self._requestor.get_file(endpoint, compression=None)
 
         return index, compressed_data
 
@@ -281,3 +290,11 @@ class Meteostat(Provider):
         df = df.loc[mask]
 
         return df
+
+    @property
+    def api_key(self) -> str | None:
+        return self._api_key
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url

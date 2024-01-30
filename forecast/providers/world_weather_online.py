@@ -6,22 +6,28 @@ from pydantic_extra_types.coordinate import Coordinate
 from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
 from forecast.providers.models import Weather
+from forecast.requestor import Requestor
 
 
 class WorldWeatherOnline(Provider):
     def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        super(Provider, self).__init__(
-            'https://api.worldweatheronline.com/premium/v1', conn, api_key
+        self._api_key = api_key
+        self._base_url = 'https://api.worldweatheronline.com/premium/v1'
+
+        self._requestor = Requestor(
+            base_url=self._base_url,
+            conn=conn,
+            api_key=self._api_key
         )
 
     async def get_historical_weather(
-        self,
-        granularity: Granularity,
-        coordinate: Coordinate,
-        start_date: datetime,
-        end_date: datetime,
+            self,
+            granularity: Granularity,
+            coordinate: Coordinate,
+            start_date: datetime,
+            end_date: datetime,
     ):
-        raw = await self._get(
+        raw = await self._requestor.get(
             '/past-weather.ashx',
             params={
                 'q': f'{coordinate.latitude},{coordinate.longitude}',
@@ -29,7 +35,7 @@ class WorldWeatherOnline(Provider):
                 'enddate': end_date.strftime('%Y-%m-%d'),
                 'tp': granularity.value,
                 'format': 'json',
-                'key': self.api_key,
+                'key': self._api_key,
             },
         )
 
@@ -53,3 +59,11 @@ class WorldWeatherOnline(Provider):
                 ))
 
         return data
+
+    @property
+    def api_key(self) -> str | None:
+        return self._api_key
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url

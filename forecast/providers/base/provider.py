@@ -1,18 +1,13 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from datetime import datetime
-from typing import Any, TypeAlias
 
-import aiohttp
-from pydantic import BaseModel
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.providers.enums import Granularity
-from forecast.providers.base.requestor import Requestor
-
-HistoricalWeather: TypeAlias = dict[Any, Any] | BaseModel
+from forecast.providers.models import Weather
 
 
-class Provider(Requestor):
+class Provider(ABC):
     @abstractmethod
     async def get_historical_weather(
         self,
@@ -20,5 +15,15 @@ class Provider(Requestor):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ) -> HistoricalWeather:
+    ) -> dict[Weather]:
+        ...
+
+    @property
+    @abstractmethod
+    def api_key(self) -> str | None:
+        ...
+
+    @property
+    @abstractmethod
+    def base_url(self) -> str:
         ...

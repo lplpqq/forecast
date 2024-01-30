@@ -9,15 +9,18 @@ from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
 from forecast.providers.models import Weather
 from forecast.providers.schema.visual_crossing import VisualCrossingSchema
-
+from forecast.requestor import Requestor
 
 
 class VisualCrossing(Provider):
     def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        super(Provider, self).__init__(
-            'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata',
-            conn,
-            api_key,
+        self._api_key = api_key
+        self._base_url = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata'
+
+        self._requestor = Requestor(
+            base_url=self._base_url,
+            conn=conn,
+            api_key=self._api_key
         )
 
     async def get_historical_weather(
@@ -29,7 +32,7 @@ class VisualCrossing(Provider):
     ):  # -> VisualCrossingSchema:
         aggregate_hours = granularity.value
 
-        raw = await self._get(
+        raw = await self._requestor.get(
             '/history',
             params={
                 'aggregateHours': aggregate_hours,
@@ -60,3 +63,11 @@ class VisualCrossing(Provider):
 
         # return raw
         # return VisualCrossingSchema.model_validate(raw)
+
+    @property
+    def api_key(self) -> str | None:
+        return self._api_key
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url

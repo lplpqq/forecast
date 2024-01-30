@@ -7,7 +7,7 @@ from pydantic_extra_types.coordinate import Coordinate
 from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
 from forecast.providers.models import Weather
-
+from forecast.requestor import Requestor
 
 # from forecast.providers.schema.weather_bit import WeatherBitSchema
 
@@ -21,7 +21,14 @@ GRANULARITY_TO_STRING: dict[Granularity, Literal['hourly', 'daily']] = {
 
 class WeatherBit(Provider):
     def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        super(Provider, self).__init__('https://api.weatherbit.io/v2.0/', conn, api_key)
+        self._api_key = api_key
+        self._base_url = 'https://api.weatherbit.io/v2.0/'
+
+        self._requestor = Requestor(
+            base_url=self._base_url,
+            conn=conn,
+            api_key=self._api_key
+        )
 
     async def get_historical_weather(
         self,
@@ -32,7 +39,7 @@ class WeatherBit(Provider):
     ) -> List[Weather]:
         granularity_string = GRANULARITY_TO_STRING[granularity]
 
-        raw = await self._get(
+        raw = await self._requestor.get(
             f'/history/{granularity_string}',
             params={
                 'lat': coordinate.latitude,
@@ -62,3 +69,10 @@ class WeatherBit(Provider):
             for weather in raw['data']
         ]
 
+    @property
+    def api_key(self) -> str | None:
+        return self._api_key
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url
