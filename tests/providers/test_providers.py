@@ -4,10 +4,8 @@ import pytest
 from aiohttp.client import TCPConnector
 from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
-from forecast.enums import Granularity
-from forecast.providers.open_weather_map import OpenWeatherMap
-from forecast.providers.visual_crossing import VisualCrossing
-from forecast.providers.weather_bit import WeatherBit
+from forecast.providers import OpenWeatherMap, VisualCrossing, WeatherBit
+from forecast.providers.enums import Granularity
 from tests.config import config
 
 

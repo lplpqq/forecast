@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
 from itertools import islice
+from typing import Protocol
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
@@ -20,29 +21,38 @@ from forecast.providers import (
     WeatherBit,
     WorldWeatherOnline,
 )
-from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
 from forecast.providers.meteostat import Meteostat
-from forecast.services.populate_cities import populate_cities
+from forecast.services.populate_cities import PopulateCitiesService
 
 logger = logger_provider(__name__)
 
 
+class Orchestratable(Protocol):
+    async def setup(self) -> None:
+        ...
+
+    async def teardown(self) -> None:
+        ...
+
+
 @asynccontextmanager
-async def orchestrate_providers(
-    connector: aiohttp.BaseConnector,
-    *providers: Provider,
+async def orchestrate_anything(
+    *orchestratables: Orchestratable,
 ) -> AsyncIterator[None]:
-    await asyncio.gather(*[provider.setup() for provider in providers])
+    await asyncio.gather(
+        *[orchestratable.setup() for orchestratable in orchestratables]
+    )
 
     try:
         yield
     finally:
-        await asyncio.gather(*[provider.turndown() for provider in providers])
-        await connector.close()
+        await asyncio.gather(
+            *[orchestratable.teardown() for orchestratable in orchestratables]
+        )
 
 
-async def main() -> None:
+async def main(event_loop: asyncio.AbstractEventLoop) -> None:
     logger.info('Starting')
     start = time.perf_counter()
 
@@ -50,7 +60,15 @@ async def main() -> None:
     session_factory = await connect(engine)
 
     async with aiohttp.TCPConnector() as connector:
-        await populate_cities(connector, session_factory)
+        services = [PopulateCitiesService(connector, session_factory)]
+
+        async with orchestrate_anything(*services):
+            services_run_tasks: list[asyncio.Task[None]] = []
+            for service in services:
+                new_task = event_loop.create_task(service.run())
+                services_run_tasks.append(new_task)
+
+            await asyncio.gather(*services_run_tasks)
 
         location = Coordinate(
             latitude=Latitude(
@@ -65,9 +83,8 @@ async def main() -> None:
             connector, config.data_sources.world_weather_online.api_key
         )
 
-        async with orchestrate_providers(
-            connector, openmeteo, meteostat, world_weather
-        ):
+        # TODO: Convert all of this mumbo-jumbo into a service
+        async with orchestrate_anything(openmeteo, meteostat, world_weather):
             world_weather_data = await world_weather.get_historical_weather(
                 Granularity.HOUR,
                 location,
@@ -130,8 +147,9 @@ async def main() -> None:
         ):
             print(world_weather_)
             print(meteostat_)
-            # print(weathebit_)
             print(openmeteo_)
+
+            # print(weathebit_)
             # print(tomorrow_)
             # print(openweathermap_)
             # print(visualcrossing_)
@@ -152,4 +170,5 @@ def get_loop_factory() -> Callable[..., asyncio.AbstractEventLoop]:
 
 if __name__ == '__main__':
     with asyncio.Runner(loop_factory=get_loop_factory()) as runner:
-        runner.run(main())
+        loop = runner.get_loop()
+        runner.run(main(loop))

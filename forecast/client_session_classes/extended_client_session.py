@@ -120,33 +120,3 @@ class ExtendedClientSession(aiohttp.ClientSession):
         return await self._request_file(
             endpoint, method='GET', compression=compression, **kwargs
         )
-
-
-class ApiClientSession(ExtendedClientSession):
-    def __init__(
-        self,
-        base_url: str | URL,
-        api_key: str | None,
-        connector: aiohttp.BaseConnector | None = None,
-        *,
-        loop: asyncio.AbstractEventLoop | None = None,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(base_url, connector, loop=loop, **kwargs)
-
-        self.api_key = api_key
-
-    async def api_get_file(
-        self,
-        endpoint: str,
-        *,
-        compression: CompressionType = None,
-        **kwargs: Any,
-    ) -> bytes:
-        return await self.get_file(endpoint, compression=compression, **kwargs)
-
-    async def api_get(self, path: str, **kwargs: Any) -> JsonData:
-        return await self._request_json(path, method='GET', **kwargs)
-
-    async def api_post(self, path: str, **kwargs: Any) -> JsonData:
-        return await self._request_json(path, method='POST', **kwargs)

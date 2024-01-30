@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from types import TracebackType
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.api_client_session import ApiClientSession
+from forecast.client_session_classes.api_client_session import ApiClientSession
 from forecast.logging import logger_provider
 from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
@@ -27,14 +28,14 @@ class Provider(ABC):
         self._session: ApiClientSession | None = None
 
         self.is_setup = False
-        self.was_turndown_up = False
+        self.was_torn_down = False
 
         self.name = pascal_case_to_snake_case(self.__class__.__name__)
 
     async def setup(self) -> None:
-        if self.was_turndown_up:
+        if self.was_torn_down:
             self.logger.warning(
-                'This provider has already been turndown. You may not setup it again'
+                'This provider has already been teared down. You may not set it up again'
             )
             return
 
@@ -47,16 +48,25 @@ class Provider(ABC):
         self._session = ApiClientSession(self._base_url, self._api_key, self._connector)
         self.is_setup = True
 
-    async def turndown(self) -> None:
+    async def teardown(self) -> None:
         # * The None check is done in order to silence the type checker, it's not able to infer that the self.is_setup is a TypeGuard for the self._session
         if not self.is_setup or self._session is None:
-            self.logger.warning(
-                'No need to class durndown the class before it was setup.'
-            )
+            self.logger.warning('No need to tear down the class before it was setup.')
             return
 
         await self._session.close()
-        self.was_turndown_up = True
+        self.was_torn_down = True
+
+    async def __aenter__(self) -> None:
+        await self.setup()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        traceback: TracebackType,
+    ) -> None:
+        await self.teardown()
 
     @property
     def session(self) -> ApiClientSession:
