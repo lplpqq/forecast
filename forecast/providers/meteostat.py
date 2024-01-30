@@ -1,3 +1,5 @@
+# api docs https://dev.meteostat.net/api/stations/hourly.html#response
+
 from __future__ import annotations
 
 import asyncio
@@ -6,7 +8,7 @@ import io
 import os
 import time
 from asyncio import Task
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import repeat
 from pathlib import Path
 from typing import Any, Final, Literal, NewType, TypeAlias, cast
@@ -22,6 +24,7 @@ from scipy.spatial import distance
 from forecast.logging import logger_provider
 from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
+from forecast.providers.models import Weather
 from lib.caching.lru_cache import LRUCache
 from lib.fs_utils import format_path, validate_path
 from forecast.requestor import Requestor
@@ -288,6 +291,28 @@ class Meteostat(Provider):
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
+
+        # https://dev.meteostat.net/api/stations/hourly.html#response
+        #
+        # fixme it works but it takes 15 seconds
+        #
+        # return [
+        #     Weather(
+        #         date=weather['date'].to_pydatetime() + timedelta(hours=weather['hour']),
+        #         temperature=weather['temp'],
+        #         apparent_temperature=0,  # there is no such an argument
+        #         pressure=weather['pres'],
+        #         wind_speed=weather['wspd'],
+        #         wind_gust_speed=round(weather['wpgt'] / 3.6, 2),  # converts km/h to m/s
+        #         wind_direction=weather['wdir'],
+        #         humidity=weather['rhum'],
+        #         clouds=0,  # there is no such an argument
+        #         precipitation=float(weather['prcp']),
+        #         snow=weather['snow'],
+        #     )
+        #     for index, weather in df.iterrows()
+        # ]
+
 
         return df
 
