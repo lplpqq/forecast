@@ -1,23 +1,18 @@
 from datetime import datetime
+from typing import Any
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
-from forecast.requestor import Requestor
+from forecast.providers.enums import Granularity
+
+BASE_URL = 'https://api.tomorrow.io/v4'
 
 
 class Tomorrow(Provider):
-    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        self._api_key = api_key
-        self._base_url = 'https://api.tomorrow.io/v4'
-
-        self._requestor = Requestor(
-            base_url=self._base_url,
-            conn=conn,
-            api_key=self._api_key
-        )
+    def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None) -> None:
+        super().__init__(BASE_URL, conn, api_key)
 
     async def get_historical_weather(
         self,
@@ -25,9 +20,10 @@ class Tomorrow(Provider):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ):
+        # TODO: Into common object, if we will even use it. Otherwise - delete it. We will either way have it git.
+    ) -> Any:
         # * https://docs.tomorrow.io/reference/historical
-        return await self._requestor.post(
+        return await self.session.api_post(
             '/historical',
             params={
                 'apikey': self.api_key,
@@ -51,11 +47,3 @@ class Tomorrow(Provider):
                 'location': f'{coordinate.longitude}, {coordinate.latitude}',
             },
         )
-
-    @property
-    def api_key(self) -> str | None:
-        return self._api_key
-
-    @property
-    def base_url(self) -> str:
-        return self._base_url

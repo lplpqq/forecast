@@ -1,34 +1,24 @@
 from datetime import datetime
-from typing import Literal, List
+from typing import List, Literal
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
+from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
-from forecast.requestor import Requestor
-
-# from forecast.providers.schema.weather_bit import WeatherBitSchema
-
 
 GRANULARITY_TO_STRING: dict[Granularity, Literal['hourly', 'daily']] = {
     Granularity.HOUR: 'hourly',
     Granularity.DAY: 'hourly',
 }
 
+BASE_URL = 'https://api.weatherbit.io/v2.0/'
 
 
 class WeatherBit(Provider):
-    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        self._api_key = api_key
-        self._base_url = 'https://api.weatherbit.io/v2.0/'
-
-        self._requestor = Requestor(
-            base_url=self._base_url,
-            conn=conn,
-            api_key=self._api_key
-        )
+    def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None) -> None:
+        super().__init__(BASE_URL, conn, api_key)
 
     async def get_historical_weather(
         self,
@@ -39,7 +29,7 @@ class WeatherBit(Provider):
     ) -> List[Weather]:
         granularity_string = GRANULARITY_TO_STRING[granularity]
 
-        raw = await self._requestor.get(
+        raw = await self.session.api_get(
             f'/history/{granularity_string}',
             params={
                 'lat': coordinate.latitude,
@@ -50,7 +40,7 @@ class WeatherBit(Provider):
             },
         )
 
-        #print(raw)
+        # print(raw)
         return [
             Weather(
                 date=datetime.strptime(weather['datetime'], '%Y-%m-%d:%H'),
@@ -64,7 +54,7 @@ class WeatherBit(Provider):
                 clouds=weather['clouds'],
                 precipitation=float(weather['precip']),
                 snow=weather['snow'],
-                #description=weather['weather']['description']
+                # description=weather['weather']['description']
             )
             for weather in raw['data']
         ]

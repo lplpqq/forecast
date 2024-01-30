@@ -4,26 +4,20 @@ from typing import Any
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
-from forecast.requestor import Requestor
+from forecast.providers.enums import Granularity
 
 GRANULARITY_TO_STRING: dict[Granularity, str] = {
     Granularity.HOUR: 'hour',
     Granularity.DAY: 'day',
 }
 
+BASE_URL = 'https://history.openweathermap.org/data/2.5'
+
 
 class OpenWeatherMap(Provider):
-    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        self._api_key = api_key
-        self._base_url = 'https://history.openweathermap.org/data/2.5'
-
-        self._requestor = Requestor(
-            base_url=self._base_url,
-            conn=conn,
-            api_key=self._api_key
-        )
+    def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None) -> None:
+        super().__init__(BASE_URL, conn, api_key)
 
     async def get_historical_weather(
         self,
@@ -31,10 +25,10 @@ class OpenWeatherMap(Provider):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ) -> dict[Any, Any]:
+    ) -> Any:
         granularity_string = GRANULARITY_TO_STRING[granularity]
 
-        return await self._requestor.get(
+        return await self.session.api_get(
             '/history/city',
             params={
                 'lat': coordinate.latitude,
@@ -45,11 +39,3 @@ class OpenWeatherMap(Provider):
                 'appid': self.api_key,
             },
         )
-
-    @property
-    def api_key(self) -> str | None:
-        return self._api_key
-
-    @property
-    def base_url(self) -> str:
-        return self._base_url

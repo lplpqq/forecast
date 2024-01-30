@@ -8,7 +8,7 @@ import io
 import os
 import time
 from asyncio import Task
-from datetime import datetime, timedelta
+from datetime import datetime
 from itertools import repeat
 from pathlib import Path
 from typing import Any, Final, Literal, NewType, TypeAlias, cast
@@ -21,13 +21,11 @@ import pandas as pd
 from pydantic_extra_types.coordinate import Coordinate
 from scipy.spatial import distance
 
-from forecast.logging import logger_provider
 from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
 from lib.caching.lru_cache import LRUCache
 from lib.fs_utils import format_path, validate_path
-from forecast.requestor import Requestor
 
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
@@ -53,6 +51,8 @@ GRANULARITY_TO_STRING: Final[dict[Granularity, Literal['hourly', 'daily']]] = {
     Granularity.DAY: 'daily',
 }
 
+
+# https://dev.meteostat.net/api/stations/hourly.html#response
 # CSV file contents:
 # 1	    date	The date string (format: YYYY-MM-DD)	    String
 # 2	    hour	The hour (UTC)	                            Integer
@@ -69,19 +69,19 @@ GRANULARITY_TO_STRING: Final[dict[Granularity, Literal['hourly', 'daily']]] = {
 # 13	coco	The weather condition code	Integer
 
 DEFAULT_CSV_NAMES = (
-        'date',
-        'hour',
-        'temp',
-        'dwpt',
-        'rhum',
-        'prcp',
-        'snow',
-        'wdir',
-        'wspd',
-        'wpgt',
-        'pres',
-        'tsun',
-        'coco',
+    'date',
+    'hour',
+    'temp',
+    'dwpt',
+    'rhum',
+    'prcp',
+    'snow',
+    'wdir',
+    'wspd',
+    'wpgt',
+    'pres',
+    'tsun',
+    'coco',
 )
 
 
@@ -96,7 +96,7 @@ def parse_year_data(task_result: tuple[int, bytes]) -> tuple[int, pd.DataFrame]:
 
 
 def _generate_endpoint_path(
-        granularity: Granularity, station: str, year: int | None = None
+    granularity: Granularity, station: str, year: int | None = None
 ) -> str:
     path = f'/{GRANULARITY_TO_STRING[granularity]}/'
 
@@ -106,18 +106,13 @@ def _generate_endpoint_path(
     return f'{path}{station}.csv.gz'
 
 
+BASE_URL = 'https://bulk.meteostat.net/v2'
+
+
 class Meteostat(Provider):
     def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None = None) -> None:
-        self._api_key = api_key
-        self._base_url = 'https://bulk.meteostat.net/v2'
+        super().__init__(BASE_URL, conn, api_key)
 
-        self._requestor = Requestor(
-            base_url=self._base_url,
-            conn=conn,
-            api_key=self._api_key
-        )
-
-        self.logger = logger_provider(__name__)
         self._event_loop = asyncio.get_event_loop()
 
         self._stations_cache_file = STATIONS_CACHE_FOLDER.joinpath('./list-lite.json')
@@ -135,6 +130,8 @@ class Meteostat(Provider):
         self._hourly_cache = LRUCache[CacheKey, CacheEntry](DEFAULT_CACHE_SIZE)
 
     async def setup(self) -> None:
+        await super().setup()
+
         # TODO: Consider storing this data, which is UNIQUE to meteostat in a separate db table not to load this file every time
         if self._stations_cache_file.exists():
             self.logger.info(
@@ -160,7 +157,7 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            decompressed_file = await self._requestor.get_file(
+            decompressed_file = await self.session.api_get_file(
                 '/stations/lite.json.gz', compression='gzip'
             )
 
@@ -203,8 +200,7 @@ class Meteostat(Provider):
 
         start = time.perf_counter()
         closest = distance.cdist(
-            np.array([(point.latitude, point.longitude)]),
-            self._stations_coordinates
+            np.array([(point.latitude, point.longitude)]), self._stations_coordinates
         )
         end = time.perf_counter()
 
@@ -219,7 +215,7 @@ class Meteostat(Provider):
         self, granularity: Granularity, station_id: StationId, year: int, index: int
     ) -> tuple[int, bytes]:
         endpoint = _generate_endpoint_path(granularity, station_id, year)
-        compressed_data = await self._requestor.get_file(endpoint, compression=None)
+        compressed_data = await self.session.api_get_file(endpoint, compression=None)
 
         return index, compressed_data
 
@@ -258,15 +254,37 @@ class Meteostat(Provider):
         results = list(results_iter)
         end = time.perf_counter()
 
-        self.logger.debug(
-            f'Took to parse {len(results)} CSV file(s): {end - start}'
-        )
+        self.logger.debug(f'Took to parse {len(results)} CSV file(s): {end - start}')
 
         for year, (index, data) in zip(years_range, results):
             self._hourly_cache[(station_id, year)] = data
             combined_results[index] = data
 
         concatednated_df = pd.concat(combined_results)
+
+        # * Reordering the table columns
+        concatednated_df['apparent_temp'] = None
+        concatednated_df['clouds'] = None
+
+        concatednated_df = concatednated_df[
+            [
+                'date',
+                'temp',
+                'apparent_temp',
+                'pres',
+                'wspd',
+                'wpgt',
+                'wdir',
+                'rhum',
+                'clouds',
+                'prcp',
+                'snow',
+            ]
+        ]
+
+        concatednated_df['wspd'] = concatednated_df['wspd'] / 3.6
+        concatednated_df['wpgt'] = concatednated_df['wpgt'] / 3.6
+
         return concatednated_df
 
     async def get_historical_weather(
@@ -277,7 +295,7 @@ class Meteostat(Provider):
         end_date: datetime,
     ) -> Any:
         if granularity is not Granularity.HOUR:
-            raise ValueError(f"Unsupported granularity: {granularity.name}")
+            raise ValueError(f'Unsupported granularity: {granularity.name}')
         # NOTE: Maybe cache?
         nearest_station = self._find_nearest_station(coordinate)
 
@@ -285,36 +303,16 @@ class Meteostat(Provider):
             f'Nearest station for {coordinate} is {nearest_station} ({distance} km)'
         )
 
-        df = await self.get_for_station(
-            nearest_station, start_date, end_date
-        )
+        df = await self.get_for_station(nearest_station, start_date, end_date)
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
 
-        # https://dev.meteostat.net/api/stations/hourly.html#response
-        #
-        # fixme it works but it takes 15 seconds
-        #
-        # return [
-        #     Weather(
-        #         date=weather['date'].to_pydatetime() + timedelta(hours=weather['hour']),
-        #         temperature=weather['temp'],
-        #         apparent_temperature=0,  # there is no such an argument
-        #         pressure=weather['pres'],
-        #         wind_speed=weather['wspd'],
-        #         wind_gust_speed=round(weather['wpgt'] / 3.6, 2),  # converts km/h to m/s
-        #         wind_direction=weather['wdir'],
-        #         humidity=weather['rhum'],
-        #         clouds=0,  # there is no such an argument
-        #         precipitation=float(weather['prcp']),
-        #         snow=weather['snow'],
-        #     )
-        #     for index, weather in df.iterrows()
-        # ]
+        data: list[Weather] = []
+        for tuple_ in df.itertuples():
+            data.append(Weather._make(tuple_[1:]))
 
-
-        return df
+        return data
 
     @property
     def api_key(self) -> str | None:

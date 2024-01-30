@@ -5,23 +5,16 @@ from datetime import datetime
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.providers.enums import Granularity
 from forecast.providers.base import Provider
+from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
-from forecast.providers.schema.visual_crossing import VisualCrossingSchema
-from forecast.requestor import Requestor
+
+BASE_URL = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata'
 
 
 class VisualCrossing(Provider):
-    def __init__(self, conn: aiohttp.TCPConnector, api_key: str | None) -> None:
-        self._api_key = api_key
-        self._base_url = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata'
-
-        self._requestor = Requestor(
-            base_url=self._base_url,
-            conn=conn,
-            api_key=self._api_key
-        )
+    def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None) -> None:
+        super().__init__(BASE_URL, conn, api_key)
 
     async def get_historical_weather(
         self,
@@ -29,10 +22,10 @@ class VisualCrossing(Provider):
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
-    ):  # -> VisualCrossingSchema:
+    ) -> list[Weather]:
         aggregate_hours = granularity.value
 
-        raw = await self._requestor.get(
+        raw = await self.session.api_get(
             '/history',
             params={
                 'aggregateHours': aggregate_hours,
@@ -51,7 +44,11 @@ class VisualCrossing(Provider):
                 apparent_temperature=weather['feelslike'],
                 pressure=weather['sealevelpressure'],  # note it's a sea level pressure
                 wind_speed=weather['wspd'],
-                wind_gust_speed=weather['wspd'] if weather['wgust'] is None else weather['wgust'],  # May be empty if it is not significantly higher than the wind speed
+                wind_gust_speed=weather['wspd']
+                if weather['wgust'] is None
+                else weather[
+                    'wgust'
+                ],  # May be empty if it is not significantly higher than the wind speed
                 wind_direction=weather['wdir'],
                 humidity=weather['humidity'],
                 clouds=weather['cloudcover'],

@@ -1,51 +1,86 @@
 import asyncio
 import sys
+import time
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from datetime import datetime
+from itertools import islice
 
-from aiohttp import TCPConnector
+import aiohttp
 from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
-from forecast.providers.enums import Granularity
-from forecast.logging import logger_provider
-from forecast.providers import WeatherBit, OpenMeteo, WorldWeatherOnline, Tomorrow, OpenWeatherMap, VisualCrossing
-from forecast.providers.meteostat import Meteostat
 from forecast.config import config
+from forecast.logging import logger_provider
+from forecast.providers import (
+    OpenMeteo,
+    OpenWeatherMap,
+    Tomorrow,
+    VisualCrossing,
+    WeatherBit,
+    WorldWeatherOnline,
+)
+from forecast.providers.base import Provider
+from forecast.providers.enums import Granularity
+from forecast.providers.meteostat import Meteostat
 
 logger = logger_provider(__name__)
 
 
+@asynccontextmanager
+async def orchestrate_providers(
+    connector: aiohttp.BaseConnector,
+    *providers: Provider,
+) -> AsyncIterator[None]:
+    await asyncio.gather(*[provider.setup() for provider in providers])
+
+    try:
+        yield
+    finally:
+        await asyncio.gather(*[provider.clean_up() for provider in providers])
+        await connector.close()
+
+
 async def main() -> None:
     logger.info('Starting')
-    start_time = datetime.now()
+    start = time.perf_counter()
 
-    async with TCPConnector() as connector:
+    async with aiohttp.TCPConnector() as connector:
         location = Coordinate(
             latitude=Latitude(
                 52.1652366,
             ),
-            longitude=Longitude(
-                20.8647919
-            )
+            longitude=Longitude(20.8647919),
         )
 
-        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
-        world_weather_data = await world_weather.get_historical_weather(
-            Granularity.HOUR,
-            location,
-            start_date=datetime(2024, 1, 5),
-            end_date=datetime(2024, 1, 15)
-        )
-
+        openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         meteostat = Meteostat(connector, config.data_sources.meteostat.api_key)
-        await meteostat.setup()  # meteostat is the only class that requires setup, as it calls setup of exactly Meteostat class, but not setup of Requestor class
-        meteostat_data = await meteostat.get_historical_weather(
-            Granularity.HOUR,
-            Coordinate(
-                latitude=Latitude(35.6897), longitude=Longitude(139.6922)
-            ),
-            start_date=datetime(2010, 1, 5),
-            end_date=datetime(2024, 1, 15),
+        world_weather = WorldWeatherOnline(
+            connector, config.data_sources.world_weather_online.api_key
         )
+
+        async with orchestrate_providers(
+            connector, openmeteo, meteostat, world_weather
+        ):
+            world_weather_data = await world_weather.get_historical_weather(
+                Granularity.HOUR,
+                location,
+                start_date=datetime(2024, 1, 5),
+                end_date=datetime(2024, 1, 15),
+            )
+
+            meteostat_data = await meteostat.get_historical_weather(
+                Granularity.HOUR,
+                Coordinate(latitude=Latitude(35.6897), longitude=Longitude(139.6922)),
+                start_date=datetime(2010, 1, 5),
+                end_date=datetime(2024, 1, 15),
+            )
+
+            openmeteo_data = await openmeteo.get_historical_weather(
+                Granularity.HOUR,
+                location,
+                start_date=datetime(2024, 1, 5),
+                end_date=datetime(2024, 1, 15),
+            )
 
         # weatherbit = WeatherBit(connector, config.data_sources.weather_bit.api_key)
         # weatherbit_data = await weatherbit.get_historical_weather(
@@ -54,14 +89,6 @@ async def main() -> None:
         #     start_date=datetime(2024, 1, 5),
         #     end_date=datetime(2024, 1, 15)
         # )
-
-        openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
-        openmeteo_data = await openmeteo.get_historical_weather(
-            Granularity.HOUR,
-            location,
-            start_date=datetime(2024, 1, 5),
-            end_date=datetime(2024, 1, 15)
-        )
 
         # tomorrow = Tomorrow(connector, config.data_sources.tomorrow.api_key)
         # tomorrow_data = await tomorrow.get_historical_weather(
@@ -91,8 +118,8 @@ async def main() -> None:
         #         world_weather_data, meteostat_data, weatherbit_data, openmeteo_data, tomorrow_data, openweathermap_data,
         #         visualcrossing_data
         # ):
-        for world_weather_, meteostat_, openmeteo_ in zip(
-                world_weather_data, meteostat_data, openmeteo_data
+        for world_weather_, meteostat_, openmeteo_ in islice(
+            zip(world_weather_data, meteostat_data, openmeteo_data), 5
         ):
             print(world_weather_)
             print(meteostat_)
@@ -102,15 +129,18 @@ async def main() -> None:
             # print(openweathermap_)
             # print(visualcrossing_)
             print()
-    end_time = datetime.now()
-    logger.info(f'Time taken - {end_time - start_time}')
+
+    end = time.perf_counter()
+    logger.info(f'Time taken - {end - start}')
 
 
-def get_loop_factory() -> asyncio.AbstractEventLoop | None:
-    if sys.platform != "win32":
+def get_loop_factory() -> Callable[..., asyncio.AbstractEventLoop]:
+    if sys.platform != 'win32':
         import uvloop
+
         return uvloop.new_event_loop
-    return None
+
+    return asyncio.new_event_loop
 
 
 if __name__ == '__main__':
