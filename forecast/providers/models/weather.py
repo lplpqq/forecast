@@ -3,6 +3,8 @@ from typing import NamedTuple
 
 
 class Weather(NamedTuple):
+    data_source: str
+
     date: datetime
     temperature: float  # temperature (°C)
     apparent_temperature: float  # apparent aka feels like temperature (°C)

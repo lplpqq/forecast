@@ -86,6 +86,7 @@ class OpenMeteo(Provider):
         ):
             data.append(
                 Weather(
+                    data_source=self.name,
                     date=datetime.strptime(time, '%Y-%m-%dT%H:%M'),
                     temperature=temperature,
                     apparent_temperature=apparent_temperature,

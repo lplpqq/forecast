@@ -1,21 +1,19 @@
+from __future__ import annotations
+
 from datetime import datetime
 
-from sqlalchemy import DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from forecast.models.base import Base
+from forecast.db.models.base import Base
+from forecast.db.models.location import Location
 
 
-class Weather(Base):
-    __tablename__ = 'weather'
+class HistoricalHourlyWeather(Base):
+    __tablename__ = 'hitstorical_hourly_weather'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-
-    # FIXME: Move to a related table.
-    # city = Column(String)
-    # country = Column(String)
-    # city_id = Column(Integer)
-    # country_id = Column(Integer)
+    data_source: Mapped[str] = mapped_column()
 
     date: Mapped[datetime] = mapped_column(DateTime)
     pressure: Mapped[float] = mapped_column()
@@ -29,3 +27,6 @@ class Weather(Base):
     visibility: Mapped[float] = mapped_column()
     precipitation: Mapped[float] = mapped_column()
     snow: Mapped[float] = mapped_column()
+
+    location_id: Mapped[int] = mapped_column(ForeignKey('location.id'))
+    location: Mapped[Location] = relationship(back_populates='hourly_history')

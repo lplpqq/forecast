@@ -8,11 +8,12 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from forecast import models
-from forecast.providers.base import Requestor
+from forecast.api_client_session import ExtendedClientSession
+from forecast.db import models
+from forecast.services.models import CityTuple
 from lib.fs_utils import validate_path
 
-# TODO: Abstract away...
+# TODO: Create a class for this we are going to have other services as well. I think it's a nice architecture.
 CACHE_FOLDER: Final[Path] = Path('./.cache')
 CITIES_CACHE_FILE: Final[Path] = CACHE_FOLDER.joinpath('./cities/cities.csv')
 
@@ -28,14 +29,14 @@ async def fetch_cities_list(connector: aiohttp.BaseConnector) -> pd.DataFrame:
         autocreate_is_recursive=True,
     )
 
-    # if CITIES_CACHE_FILE.exists():
-    #     df = pd.read_csv(CITIES_CACHE_FILE)
-    #     return df
+    if CITIES_CACHE_FILE.exists():
+        df = pd.read_csv(CITIES_CACHE_FILE)
+        return df
 
-    async with Requestor(
+    async with ExtendedClientSession(
         'https://simplemaps.com/static/data/world-cities/basic', connector
-    ) as requestor:
-        archive = await requestor.get_file('/simplemaps_worldcities_basicv1.76.zip')
+    ) as session:
+        archive = await session.get_file('/simplemaps_worldcities_basicv1.76.zip')
         file_io = io.BytesIO(archive)
 
         with zipfile.ZipFile(file_io) as archive_handle:
@@ -65,7 +66,7 @@ async def populate_cities(
         present_source_ids = set(await session.scalars(present_source_ids_query))
 
         for row in df.itertuples():
-            city_tuple = models.CityTuple._make(row[1:])
+            city_tuple = CityTuple._make(row[1:])
             if int(city_tuple.id) in present_source_ids:
                 continue
 

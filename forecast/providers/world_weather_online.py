@@ -40,6 +40,7 @@ class WorldWeatherOnline(Provider):
             for hour in day['hourly']:
                 data.append(
                     Weather(
+                        data_source=self.name,
                         date=day_time + timedelta(hours=int(hour['time']) // 100),
                         temperature=float(hour['tempC']),
                         apparent_temperature=float(hour['FeelsLikeC']),

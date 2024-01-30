@@ -39,6 +39,7 @@ class VisualCrossing(Provider):
 
         return [
             Weather(
+                data_source=self.name,
                 date=datetime.fromtimestamp(weather['datetime']),
                 temperature=weather['temp'],
                 apparent_temperature=weather['feelslike'],

@@ -10,6 +10,7 @@ import aiohttp
 from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
 from forecast.config import config
+from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
 from forecast.providers import (
     OpenMeteo,
@@ -22,6 +23,7 @@ from forecast.providers import (
 from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
 from forecast.providers.meteostat import Meteostat
+from forecast.services.populate_cities import populate_cities
 
 logger = logger_provider(__name__)
 
@@ -36,7 +38,7 @@ async def orchestrate_providers(
     try:
         yield
     finally:
-        await asyncio.gather(*[provider.clean_up() for provider in providers])
+        await asyncio.gather(*[provider.turndown() for provider in providers])
         await connector.close()
 
 
@@ -44,7 +46,12 @@ async def main() -> None:
     logger.info('Starting')
     start = time.perf_counter()
 
+    engine = create_engine(config)
+    session_factory = await connect(engine)
+
     async with aiohttp.TCPConnector() as connector:
+        await populate_cities(connector, session_factory)
+
         location = Coordinate(
             latitude=Latitude(
                 52.1652366,

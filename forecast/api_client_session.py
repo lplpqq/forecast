@@ -5,7 +5,7 @@ import json
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, Self, TypeAlias
 
 import aiohttp
 from yarl import URL
@@ -17,19 +17,16 @@ CompressionType: TypeAlias = Literal['gzip'] | None
 JsonData: TypeAlias = dict[Any, Any]
 
 
-class ApiClientSession(aiohttp.ClientSession):
+class ExtendedClientSession(aiohttp.ClientSession):
     def __init__(
         self,
         base_url: str | URL,
-        api_key: str | None,
         connector: aiohttp.BaseConnector | None = None,
         *,
         loop: asyncio.AbstractEventLoop | None = None,
         **kwargs: Any,
     ) -> None:
         self.logger = logger_provider(__name__)
-
-        self.api_key = api_key
 
         if not isinstance(base_url, URL):
             base_url = URL(base_url)
@@ -49,6 +46,9 @@ class ApiClientSession(aiohttp.ClientSession):
             connector_owner=connector is None,
             **kwargs,
         )
+
+    async def __aenter__(self) -> Self:
+        return self
 
     def _resolve_relative_path(self, additional: str) -> str:
         additional = additional if additional.startswith('/') else f'/{additional}'
@@ -110,7 +110,7 @@ class ApiClientSession(aiohttp.ClientSession):
 
             return decompressed
 
-    async def api_get_file(
+    async def get_file(
         self,
         endpoint: str,
         *,
@@ -120,6 +120,30 @@ class ApiClientSession(aiohttp.ClientSession):
         return await self._request_file(
             endpoint, method='GET', compression=compression, **kwargs
         )
+
+
+class ApiClientSession(ExtendedClientSession):
+    def __init__(
+        self,
+        base_url: str | URL,
+        api_key: str | None,
+        connector: aiohttp.BaseConnector | None = None,
+        *,
+        loop: asyncio.AbstractEventLoop | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(base_url, connector, loop=loop, **kwargs)
+
+        self.api_key = api_key
+
+    async def api_get_file(
+        self,
+        endpoint: str,
+        *,
+        compression: CompressionType = None,
+        **kwargs: Any,
+    ) -> bytes:
+        return await self.get_file(endpoint, compression=compression, **kwargs)
 
     async def api_get(self, path: str, **kwargs: Any) -> JsonData:
         return await self._request_json(path, method='GET', **kwargs)

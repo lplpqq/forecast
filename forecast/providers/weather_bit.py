@@ -43,6 +43,7 @@ class WeatherBit(Provider):
         # print(raw)
         return [
             Weather(
+                data_source=self.name,
                 date=datetime.strptime(weather['datetime'], '%Y-%m-%d:%H'),
                 temperature=weather['temp'],
                 apparent_temperature=weather['app_temp'],

@@ -8,6 +8,7 @@ from forecast.api_client_session import ApiClientSession
 from forecast.logging import logger_provider
 from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
+from forecast.utils import pascal_case_to_snake_case
 
 
 class Provider(ABC):
@@ -26,12 +27,14 @@ class Provider(ABC):
         self._session: ApiClientSession | None = None
 
         self.is_setup = False
-        self.was_cleaned_up = False
+        self.was_turndown_up = False
+
+        self.name = pascal_case_to_snake_case(self.__class__.__name__)
 
     async def setup(self) -> None:
-        if self.was_cleaned_up:
+        if self.was_turndown_up:
             self.logger.warning(
-                'This provider has already been cleaned up. You may not setup it again'
+                'This provider has already been turndown. You may not setup it again'
             )
             return
 
@@ -44,14 +47,16 @@ class Provider(ABC):
         self._session = ApiClientSession(self._base_url, self._api_key, self._connector)
         self.is_setup = True
 
-    async def clean_up(self) -> None:
+    async def turndown(self) -> None:
         # * The None check is done in order to silence the type checker, it's not able to infer that the self.is_setup is a TypeGuard for the self._session
         if not self.is_setup or self._session is None:
-            self.logger.warning('No need to class clean_up before setup.')
+            self.logger.warning(
+                'No need to class durndown the class before it was setup.'
+            )
             return
 
         await self._session.close()
-        self.was_cleaned_up = True
+        self.was_turndown_up = True
 
     @property
     def session(self) -> ApiClientSession:

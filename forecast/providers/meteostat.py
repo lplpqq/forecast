@@ -308,6 +308,8 @@ class Meteostat(Provider):
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
 
+        df['data_source'] = self.name
+
         data: list[Weather] = []
         for tuple_ in df.itertuples():
             data.append(Weather._make(tuple_[1:]))
