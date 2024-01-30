@@ -11,7 +11,6 @@ from itertools import repeat
 from pathlib import Path
 from typing import Any, Final, Literal, NewType, TypeAlias, cast
 
-import aiofiles
 import aiohttp
 import numpy as np
 import numpy.typing as npt
@@ -20,8 +19,8 @@ import pandas as pd
 from pydantic_extra_types.coordinate import Coordinate
 from scipy.spatial import distance
 
-from forecast.enums import Granularity
 from forecast.providers.base import Provider
+from forecast.providers.enums import Granularity
 from lib.caching.lru_cache import LRUCache
 from lib.fs_utils import format_path, validate_path
 
