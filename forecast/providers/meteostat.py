@@ -79,13 +79,11 @@ DEFAULT_CSV_NAMES = (
 )
 
 
-def parse_year_data(task_result: tuple[int, bytes]) -> tuple[int, pd.DataFrame]:
-    index, raw_data = task_result
-
-    df = pd.read_csv(io.BytesIO(raw_data), names=DEFAULT_CSV_NAMES, parse_dates=['date'],
+def parse_year_data(task_result: bytes) -> pd.DataFrame:
+    df = pd.read_csv(io.BytesIO(task_result), names=DEFAULT_CSV_NAMES, parse_dates=['date'],
                      compression='gzip')
 
-    return index, df
+    return df
 
 
 def _generate_endpoint_path(
@@ -205,7 +203,7 @@ class Meteostat(Provider):
         self, granularity: Granularity, station_id: StationId, year: int
     ) -> bytes:
         endpoint = _generate_endpoint_path(granularity, station_id, year)
-        compressed_data = await self.session.api_get_file(endpoint, compression=None)
+        compressed_data = await self.session.get_file(endpoint)
 
         return compressed_data
 
@@ -279,6 +277,7 @@ class Meteostat(Provider):
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
+        print(next(df.itertuples(index=False)))
 
         return [Weather._make(tuple_) for tuple_ in df.itertuples(index=False)]
 
