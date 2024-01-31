@@ -173,7 +173,7 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
         #     print()
 
     end = time.perf_counter()
-    logger.info(f'Time taken - {end - start}')
+    logger.info(f'Time taken - {(end - start) * 1000:.2f}ms')
 
 
 def get_loop_factory() -> Callable[..., asyncio.AbstractEventLoop]:

@@ -6,11 +6,8 @@ import asyncio
 import gzip
 import io
 import json
-import os
 import time
-from asyncio import Task
 from datetime import datetime
-from itertools import repeat
 from pathlib import Path
 from typing import Any, Final, Literal, NewType, TypeAlias, cast
 
@@ -27,6 +24,7 @@ from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
 from lib.fs_utils import format_path, validate_path
 
+
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
 STATIONS_CACHE_FOLDER: Final[Path] = METEOSTAT_CACHE_FOLDER.joinpath('./stations/')
@@ -34,11 +32,6 @@ STATIONS_CACHE_FOLDER: Final[Path] = METEOSTAT_CACHE_FOLDER.joinpath('./stations
 FloatsArray: TypeAlias = npt.NDArray[np.float64]
 
 StationId = NewType('StationId', str)
-CacheKey: TypeAlias = tuple[StationId, int]
-CacheEntry: TypeAlias = pd.DataFrame
-
-
-DEFAULT_CACHE_SIZE = 100
 
 GRANULARITY_TO_STRING: Final[dict[Granularity, Literal['hourly', 'daily']]] = {
     Granularity.HOUR: 'hourly',
@@ -80,8 +73,10 @@ DEFAULT_CSV_NAMES = (
 
 
 def parse_year_data(task_result: bytes) -> pd.DataFrame:
-    df = pd.read_csv(io.BytesIO(task_result), names=DEFAULT_CSV_NAMES, parse_dates=['date'],
-                     compression='gzip')
+    df = pd.read_csv(io.BytesIO(task_result), names=DEFAULT_CSV_NAMES, compression='gzip')
+    df['date'] = pd.to_datetime(df['date'] + ' ' + df['hour'].astype(str).str.zfill(2),
+                                format="%Y-%m-%d %H")
+    df.drop(['hour'], axis=1, inplace=True)
 
     return df
 
@@ -97,12 +92,9 @@ def _generate_endpoint_path(
     return f'{path}{station}.csv.gz'
 
 
-BASE_URL = 'https://bulk.meteostat.net/v2'
-
-
 class Meteostat(Provider):
     def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None = None) -> None:
-        super().__init__(BASE_URL, conn, api_key)
+        super().__init__('https://bulk.meteostat.net/v2', conn, api_key)
 
         self._event_loop = asyncio.get_event_loop()
 
@@ -158,24 +150,14 @@ class Meteostat(Provider):
 
         stations = orjson.loads(content)
 
-        latitudes: list[float] = []
-        longitudes: list[float] = []
-        ids: list[str] = []
-
-        for station in stations:
-            ids.append(station['id'])
-
-            location = station['location']
-            latitudes.append(location['latitude'])
-            longitudes.append(location['longitude'])
-
-        self._stations_df = pd.DataFrame.from_dict(
+        self._stations_df = pd.DataFrame([
             {
-                'id': ids,
-                'latitude': latitudes,
-                'longitude': longitudes,
+                'id': station['id'],
+                'latitude': station['location']['latitude'],
+                'longitude': station['location']['longitude']
             }
-        )
+            for station in stations
+        ])
 
         self._stations_coordinates = cast(
             FloatsArray, self._stations_df[['latitude', 'longitude']].values
@@ -188,7 +170,8 @@ class Meteostat(Provider):
 
         start = time.perf_counter()
         closest = distance.cdist(
-            np.array([(point.latitude, point.longitude)]), self._stations_coordinates
+            np.array([(point.latitude, point.longitude)]),
+            self._stations_coordinates
         )
         end = time.perf_counter()
 
@@ -277,7 +260,6 @@ class Meteostat(Provider):
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
-        print(next(df.itertuples(index=False)))
 
         return [Weather._make(tuple_) for tuple_ in df.itertuples(index=False)]
 
