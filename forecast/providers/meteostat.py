@@ -80,8 +80,12 @@ DEFAULT_CSV_NAMES = (
 
 
 def parse_year_data(task_result: bytes) -> pd.DataFrame:
-    df = pd.read_csv(io.BytesIO(task_result), names=DEFAULT_CSV_NAMES, parse_dates=['date'],
-                     compression='gzip')
+    df = pd.read_csv(
+        io.BytesIO(task_result),
+        names=DEFAULT_CSV_NAMES,
+        parse_dates=['date'],
+        compression='gzip',
+    )
 
     return df
 
@@ -146,9 +150,7 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            content = await self.session.get_file(
-                '/stations/lite.json.gz'
-            )
+            content = await self.session.get_file('/stations/lite.json.gz')
 
             if len(content) == 0:
                 raise ValueError('Nothing got returned from the API')
@@ -216,9 +218,7 @@ class Meteostat(Provider):
         fetch_tasks = []
         for year in range(start_date.year, end_date.year + 1):
             fetch_task = self._event_loop.create_task(
-                self._fetch_compressed_data_for_year(
-                    Granularity.HOUR, station_id, year
-                )
+                self._fetch_compressed_data_for_year(Granularity.HOUR, station_id, year)
             )
             fetch_tasks.append(fetch_task)
 
@@ -231,9 +231,10 @@ class Meteostat(Provider):
         self.logger.debug(f'Took to parse {len(results)} CSV file(s): {end - start}')
 
         concatenated_df = pd.concat(results)
-        # * Reordering the table columns
-        concatenated_df['apparent_temp'] = None
-        concatenated_df['clouds'] = None
+
+        # * Postprocessing
+        concatenated_df['apparent_temp'] = -1
+        concatenated_df['clouds'] = -1
         concatenated_df['data_source'] = self.name
 
         concatenated_df = concatenated_df[
@@ -253,9 +254,14 @@ class Meteostat(Provider):
             ]
         ]
 
-        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(2)  # converts km/h to m/s
-        concatenated_df['wpgt'] = (concatenated_df['wpgt'] / 3.6).round(2)  # converts km/h to m/s
+        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(
+            2
+        )  # converts km/h to m/s
+        concatenated_df['wpgt'] = (concatenated_df['wpgt'] / 3.6).round(
+            2
+        )  # converts km/h to m/s
 
+        concatenated_df.fillna(-1, inplace=True)
         return concatenated_df
 
     async def get_historical_weather(
@@ -277,7 +283,6 @@ class Meteostat(Provider):
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
-        print(next(df.itertuples(index=False)))
 
         return [Weather._make(tuple_) for tuple_ in df.itertuples(index=False)]
 

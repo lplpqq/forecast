@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tenacity import after_log, retry, retry_if_exception_type, stop_after_attempt
 
-from forecast.db.models import City, WeatherJournal 
+from forecast.db.models import City, WeatherJournal
 from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
 from forecast.providers.models.weather import Weather
@@ -48,8 +48,12 @@ class CollectorService(ServiceWithDB):
     async def _map_providers(
         self, to_apply: Callable[[Provider], Coroutine[Any, Any, Any]]
     ):
-        await asyncio.gather(*[self._event_loop.create_task(to_apply(provider))
-                               for provider in self._providers])
+        await asyncio.gather(
+            *[
+                self._event_loop.create_task(to_apply(provider))
+                for provider in self._providers
+            ]
+        )
 
     async def setup(self) -> None:
         setup_providers_task = self._event_loop.create_task(
@@ -73,11 +77,7 @@ class CollectorService(ServiceWithDB):
         stop=stop_after_attempt(3),
     )
     async def _fetch(
-        self,
-        provider: Provider,
-        city: City,
-        start_date: datetime,
-        end_date: datetime
+        self, provider: Provider, city: City, start_date: datetime, end_date: datetime
     ) -> list[Weather]:
         try:
             data = await provider.get_historical_weather(
@@ -139,7 +139,7 @@ class CollectorService(ServiceWithDB):
 
             start_date, end_date = self._start_date, self._end_date
             if len(present_data_dates) > 0:
-                # TODO: Consider implementing loging for splitting into multuple requests with different ranges if the gaps are small in size, even though spreadout throught a big period of time
+                # TODO: Consider implementing splitting into multuple requests with different ranges if the gaps are small in size, even though spreadout throught a big period of time
                 present_range = (min(present_data_dates), max(present_data_dates))
 
                 start_date = min(present_range[0], self._start_date)
@@ -151,9 +151,7 @@ class CollectorService(ServiceWithDB):
                 if item.date in present_data_dates:
                     continue
 
-                new_entry = WeatherJournal.from_weather_tuple(
-                    item, city.id
-                )
+                new_entry = WeatherJournal.from_weather_tuple(item, city.id)
                 session.add(new_entry)
 
             await session.commit()
