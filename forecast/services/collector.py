@@ -23,7 +23,7 @@ from forecast.services.base import ServiceWithDB
 DEFAULT_WAIT_TIME_SECS = 10
 
 
-class Collector(ServiceWithDB):
+class CollectorService(ServiceWithDB):
     def __init__(
         self,
         connector: aiohttp.BaseConnector,
