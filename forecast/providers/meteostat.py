@@ -302,14 +302,13 @@ class Meteostat(Provider):
         nearest_station = self._find_nearest_station(coordinate)
 
         self.logger.debug(
-            f'Nearest station for {coordinate} is {nearest_station} ({distance} km)'
+            f'Nearest station for ({coordinate.latitude}, {coordinate.longitude}) is {nearest_station}'
         )
 
         df = await self.get_for_station(nearest_station, start_date, end_date)
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
-
 
         data: list[Weather] = []
         for tuple_ in df.itertuples():

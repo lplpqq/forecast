@@ -9,6 +9,7 @@ from forecast.db.models.base import Base
 from forecast.db.models.city import City
 
 if typing.TYPE_CHECKING:
+    from forecast.db.models.city import City
     from forecast.db.models.historical_hourly_weather import HistoricalHourlyWeather
 
 
@@ -26,3 +27,7 @@ class Location(Base):
     hourly_history: Mapped[list[HistoricalHourlyWeather]] = relationship(
         back_populates='location'
     )
+
+    @classmethod
+    def from_city(cls, city: City) -> typing.Self:
+        return cls(latidute=city.latitude, longitude=city.longitude, city_id=city.id)

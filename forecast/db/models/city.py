@@ -35,6 +35,7 @@ class City(Base):
 
     @classmethod
     def from_city_named_tuple(cls, data: CityTuple) -> Self:
+        # NOTE: I am not sure if it will be fast enough, consider reordering the df columns in a similar fashion done in the metoestat provider as well as the weather history model
         new_city = cls(
             source_list_id=data.id,
             name=data.city,

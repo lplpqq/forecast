@@ -81,8 +81,9 @@ class ExtendedClientSession(aiohttp.ClientSession):
         async with self._request_wrapper(method, endpoint, **kwargs) as response:
             raw = await response.json()
 
-            self.logger.debug('JSON data:')
-            self.logger.debug(json.dumps(raw, indent=4))
+            # TODO: Provide a flag in the __init__?
+            # self.logger.debug('JSON data:')
+            # self.logger.debug(json.dumps(raw, indent=4))
 
             return raw
 
