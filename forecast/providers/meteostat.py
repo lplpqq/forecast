@@ -72,15 +72,6 @@ DEFAULT_CSV_NAMES = (
 )
 
 
-def parse_year_data(task_result: bytes) -> pd.DataFrame:
-    df = pd.read_csv(io.BytesIO(task_result), names=DEFAULT_CSV_NAMES, compression='gzip')
-    df['date'] = pd.to_datetime(df['date'] + ' ' + df['hour'].astype(str).str.zfill(2),
-                                format="%Y-%m-%d %H")
-    df.drop(['hour'], axis=1, inplace=True)
-
-    return df
-
-
 def _generate_endpoint_path(
     granularity: Granularity, station: str, year: int | None = None
 ) -> str:
@@ -182,13 +173,21 @@ class Meteostat(Provider):
         index = closest.argmin()
         return StationId(self._stations_df.iloc[index]['id'])
 
-    async def _fetch_compressed_data_for_year(
+    async def _fetch_data_for_year(
         self, granularity: Granularity, station_id: StationId, year: int
-    ) -> bytes:
-        endpoint = _generate_endpoint_path(granularity, station_id, year)
-        compressed_data = await self.session.get_file(endpoint)
+    ) -> pd.DataFrame:
+        if granularity is not Granularity.HOUR:
+            raise ValueError(f'Unsupported granularity: {granularity.name}')
 
-        return compressed_data
+        compressed_data = await self.session.get_file(
+            f'/{GRANULARITY_TO_STRING[granularity]}/{year}/{station_id}.csv.gz'
+        )
+
+        df = pd.read_csv(io.BytesIO(compressed_data), names=DEFAULT_CSV_NAMES, compression='gzip')
+        df['date'] = pd.to_datetime(df['date'] + ' ' + df['hour'].astype(str).str.zfill(2),
+                                    format="%Y-%m-%d %H")
+
+        return df.drop(['hour'], axis=1)
 
     async def get_for_station(
         self,
@@ -197,21 +196,18 @@ class Meteostat(Provider):
         end_date: datetime,
     ) -> pd.DataFrame:
         fetch_tasks = []
+        start = time.perf_counter()
         for year in range(start_date.year, end_date.year + 1):
             fetch_task = self._event_loop.create_task(
-                self._fetch_compressed_data_for_year(
+                self._fetch_data_for_year(
                     Granularity.HOUR, station_id, year
                 )
             )
             fetch_tasks.append(fetch_task)
 
-        per_year_data = await asyncio.gather(*fetch_tasks)
-
-        start = time.perf_counter()
-        results = list(map(parse_year_data, per_year_data))
+        results = await asyncio.gather(*fetch_tasks)
         end = time.perf_counter()
-
-        self.logger.debug(f'Took to parse {len(results)} CSV file(s): {end - start}')
+        self.logger.debug(f'Took to gather and parse {len(results)} CSV file(s): {end - start}')
 
         concatenated_df = pd.concat(results)
         # * Reordering the table columns
