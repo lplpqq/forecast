@@ -87,37 +87,12 @@ class ExtendedClientSession(aiohttp.ClientSession):
 
             return raw
 
-    async def _request_file(
-        self,
-        endpoint: str,
-        *,
-        method: MethodType = 'GET',
-        compression: CompressionType = None,
-        **kwargs: Any,
-    ) -> bytes:
-        async with self._request_wrapper(method, endpoint, **kwargs) as response:
-            contents = await response.read()
-            self.logger.debug(f'File contents size: approx. {len(contents)} bytes')
-
-            if compression is None:
-                return contents
-
-            match compression:
-                case 'gzip':
-                    decompressed = gzip.decompress(contents)
-
-            del contents
-            gc.collect(generation=0)
-
-            return decompressed
-
     async def get_file(
         self,
         endpoint: str,
-        *,
-        compression: CompressionType = None,
         **kwargs: Any,
     ) -> bytes:
-        return await self._request_file(
-            endpoint, method='GET', compression=compression, **kwargs
-        )
+        async with self._request_wrapper('GET', endpoint, **kwargs) as response:
+            content = await response.read()
+            self.logger.debug(f'File contents size: approx. {len(content)} bytes')
+            return content

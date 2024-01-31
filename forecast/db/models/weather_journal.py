@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import typing
 from datetime import datetime
 from typing import Self
 
@@ -7,12 +8,15 @@ from sqlalchemy import DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from forecast.db.models.base import Base
-from forecast.db.models.location import Location
 from forecast.providers.models import Weather
 
 
-class HistoricalHourlyWeather(Base):
-    __tablename__ = 'hitstorical_hourly_weather'
+if typing.TYPE_CHECKING:
+    from forecast.db.models.city import City
+
+
+class WeatherJournal(Base):
+    __tablename__ = 'weather_journal'
 
     id: Mapped[int] = mapped_column(primary_key=True)
     data_source: Mapped[str] = mapped_column()
@@ -29,9 +33,11 @@ class HistoricalHourlyWeather(Base):
     precipitation: Mapped[float] = mapped_column()
     snow: Mapped[float] = mapped_column()
 
-    location_id: Mapped[int] = mapped_column(ForeignKey('location.id'))
-    location: Mapped[Location] = relationship(back_populates='hourly_history')
+    city_id: Mapped[int] = mapped_column(ForeignKey('city.id'))
+    city: Mapped[City] = relationship(
+        back_populates='hourly_history'
+    )
 
     @classmethod
-    def from_weather_tuple(cls, base: Weather, location_id: int) -> Self:
-        return cls(**base._asdict(), location_id=location_id)
+    def from_weather_tuple(cls, base: Weather, city_id: int) -> Self:
+        return cls(**base._asdict(), city_id=city_id)

@@ -6,10 +6,10 @@ from typing import Self
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from forecast.db.models.base import Base
-from forecast.services.models.city import CityTuple
 
 if typing.TYPE_CHECKING:
-    from forecast.db.models.location import Location
+    from forecast.db.models import WeatherJournal
+    from forecast.services.models.city import CityTuple
 
 
 class City(Base):
@@ -31,7 +31,9 @@ class City(Base):
 
     population: Mapped[int] = mapped_column()
 
-    locations: Mapped[list[Location]] = relationship(back_populates='city')
+    hourly_history: Mapped[list[WeatherJournal]] = relationship(
+        back_populates='city'
+    )
 
     @classmethod
     def from_city_named_tuple(cls, data: CityTuple) -> Self:

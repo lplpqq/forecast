@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import gzip
 import io
+import json
 import os
 import time
 from asyncio import Task
@@ -24,17 +25,11 @@ from scipy.spatial import distance
 from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
-from lib.caching.lru_cache import LRUCache
 from lib.fs_utils import format_path, validate_path
 
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
 STATIONS_CACHE_FOLDER: Final[Path] = METEOSTAT_CACHE_FOLDER.joinpath('./stations/')
-
-
-def years_from_range(start: datetime, end: datetime) -> list[int]:
-    return list(range(start.year, end.year + 1))
-
 
 FloatsArray: TypeAlias = npt.NDArray[np.float64]
 
@@ -44,7 +39,6 @@ CacheEntry: TypeAlias = pd.DataFrame
 
 
 DEFAULT_CACHE_SIZE = 100
-CPU_COUNT = os.cpu_count() or 4
 
 GRANULARITY_TO_STRING: Final[dict[Granularity, Literal['hourly', 'daily']]] = {
     Granularity.HOUR: 'hourly',
@@ -87,10 +81,9 @@ DEFAULT_CSV_NAMES = (
 
 def parse_year_data(task_result: tuple[int, bytes]) -> tuple[int, pd.DataFrame]:
     index, raw_data = task_result
-    decompressed = gzip.decompress(raw_data).decode('utf-8')
-    io_string = io.StringIO(decompressed)
 
-    df = pd.read_csv(io_string, names=DEFAULT_CSV_NAMES, parse_dates=['date'])
+    df = pd.read_csv(io.BytesIO(raw_data), names=DEFAULT_CSV_NAMES, parse_dates=['date'],
+                     compression='gzip')
 
     return index, df
 
@@ -127,8 +120,6 @@ class Meteostat(Provider):
             autocreate_is_recursive=True,
         )
 
-        self._hourly_cache = LRUCache[CacheKey, CacheEntry](DEFAULT_CACHE_SIZE)
-
     async def setup(self) -> None:
         await super().setup()
 
@@ -157,16 +148,15 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            decompressed_file = await self.session.api_get_file(
-                '/stations/lite.json.gz', compression='gzip'
+            content = await self.session.get_file(
+                '/stations/lite.json.gz'
             )
 
-            content = decompressed_file.decode('utf-8')
             if len(content) == 0:
                 raise ValueError('Nothing got returned from the API')
 
-            with open(self._stations_cache_file, 'w+', encoding='utf-8') as file:
-                file.write(content)
+            with gzip.open(self._stations_cache_file, 'w+', encoding='utf-8') as file:
+                json.dump(content, file)
 
         stations = orjson.loads(content)
 
@@ -212,12 +202,12 @@ class Meteostat(Provider):
         return StationId(self._stations_df.iloc[index]['id'])
 
     async def _fetch_compressed_data_for_year(
-        self, granularity: Granularity, station_id: StationId, year: int, index: int
-    ) -> tuple[int, bytes]:
+        self, granularity: Granularity, station_id: StationId, year: int
+    ) -> bytes:
         endpoint = _generate_endpoint_path(granularity, station_id, year)
         compressed_data = await self.session.api_get_file(endpoint, compression=None)
 
-        return index, compressed_data
+        return compressed_data
 
     async def get_for_station(
         self,
@@ -225,49 +215,30 @@ class Meteostat(Provider):
         start_date: datetime,
         end_date: datetime,
     ) -> pd.DataFrame:
-        years_range = years_from_range(start_date, end_date)
-
-        fetch_tasks: list[Task[tuple[int, bytes]]] = []
-        combined_results: list[CacheEntry] = cast(
-            list[CacheEntry], list(repeat(0, len(years_range)))
-        )
-
-        for index, year in enumerate(years_range):
-            cache_key: CacheKey = (station_id, year)
-            maybe_entry = self._hourly_cache.get(cache_key, None)
-            if maybe_entry is not None:
-                combined_results[index] = maybe_entry
-                continue
-
+        fetch_tasks = []
+        for year in range(start_date.year, end_date.year + 1):
             fetch_task = self._event_loop.create_task(
                 self._fetch_compressed_data_for_year(
-                    Granularity.HOUR, station_id, year, index
+                    Granularity.HOUR, station_id, year
                 )
             )
-
             fetch_tasks.append(fetch_task)
 
         per_year_data = await asyncio.gather(*fetch_tasks)
 
         start = time.perf_counter()
-        results_iter = map(parse_year_data, per_year_data)
-        results = list(results_iter)
+        results = list(map(parse_year_data, per_year_data))
         end = time.perf_counter()
 
         self.logger.debug(f'Took to parse {len(results)} CSV file(s): {end - start}')
 
-        for year, (index, data) in zip(years_range, results):
-            self._hourly_cache[(station_id, year)] = data
-            combined_results[index] = data
-
-        concatednated_df = pd.concat(combined_results)
-
+        concatenated_df = pd.concat(results)
         # * Reordering the table columns
-        concatednated_df['apparent_temp'] = None
-        concatednated_df['clouds'] = None
-        concatednated_df['data_source'] = self.name
+        concatenated_df['apparent_temp'] = None
+        concatenated_df['clouds'] = None
+        concatenated_df['data_source'] = self.name
 
-        concatednated_df = concatednated_df[
+        concatenated_df = concatenated_df[
             [
                 'data_source',
                 'date',
@@ -284,10 +255,10 @@ class Meteostat(Provider):
             ]
         ]
 
-        concatednated_df['wspd'] = concatednated_df['wspd'] / 3.6
-        concatednated_df['wpgt'] = concatednated_df['wpgt'] / 3.6
+        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(2)  # converts km/h to m/s
+        concatenated_df['wpgt'] = (concatenated_df['wpgt'] / 3.6).round(2)  # converts km/h to m/s
 
-        return concatednated_df
+        return concatenated_df
 
     async def get_historical_weather(
         self,
@@ -298,7 +269,6 @@ class Meteostat(Provider):
     ) -> Any:
         if granularity is not Granularity.HOUR:
             raise ValueError(f'Unsupported granularity: {granularity.name}')
-        # NOTE: Maybe cache?
         nearest_station = self._find_nearest_station(coordinate)
 
         self.logger.debug(
@@ -310,11 +280,7 @@ class Meteostat(Provider):
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
 
-        data: list[Weather] = []
-        for tuple_ in df.itertuples():
-            data.append(Weather._make(tuple_[1:]))
-
-        return data
+        return [Weather._make(tuple_) for tuple_ in df.itertuples(index=False)]
 
     @property
     def api_key(self) -> str | None:

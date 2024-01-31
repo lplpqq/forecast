@@ -76,10 +76,11 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
         collector_service = CollectorService(
             connector,
             session_factory,
-            (datetime(2015, 1, 1), datetime(2016, 1, 1)),
+            datetime(2015, 1, 1),
+            datetime(2016, 1, 1),
             providers,
-            Granularity.HOUR,
             event_loop,
+            Granularity.HOUR,
         )
 
         services = [populate_cities_service, collector_service]

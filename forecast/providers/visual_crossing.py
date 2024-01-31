@@ -59,9 +59,6 @@ class VisualCrossing(Provider):
             for weather in raw['locations'][next(iter(raw['locations']))]['values']
         ]
 
-        # return raw
-        # return VisualCrossingSchema.model_validate(raw)
-
     @property
     def api_key(self) -> str | None:
         return self._api_key

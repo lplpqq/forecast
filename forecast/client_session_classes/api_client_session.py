@@ -25,15 +25,6 @@ class ApiClientSession(ExtendedClientSession):
 
         self.api_key = api_key
 
-    async def api_get_file(
-        self,
-        endpoint: str,
-        *,
-        compression: CompressionType = None,
-        **kwargs: Any,
-    ) -> bytes:
-        return await self.get_file(endpoint, compression=compression, **kwargs)
-
     async def api_get(self, path: str, **kwargs: Any) -> JsonData:
         return await self._request_json(path, method='GET', **kwargs)
 
