@@ -44,7 +44,7 @@ class PopulateCitiesService(MininalServiceWithEverything):
             df = pd.read_csv(CITIES_CACHE_FILE)
             return df
 
-        archive = await self._aiohttp_session.get_file(
+        archive = await self._aiohttp_session.get_raw(
             '/simplemaps_worldcities_basicv1.76.zip'
         )
         file_io = io.BytesIO(archive)

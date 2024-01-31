@@ -129,7 +129,7 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            content = await self.session.get_file(
+            content = await self.session.get_raw(
                 '/stations/lite.json.gz'
             )
 
@@ -179,7 +179,7 @@ class Meteostat(Provider):
         if granularity is not Granularity.HOUR:
             raise ValueError(f'Unsupported granularity: {granularity.name}')
 
-        compressed_data = await self.session.get_file(
+        compressed_data = await self.session.get_raw(
             f'/{GRANULARITY_TO_STRING[granularity]}/{year}/{station_id}.csv.gz'
         )
 

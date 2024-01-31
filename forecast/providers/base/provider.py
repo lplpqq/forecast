@@ -5,7 +5,7 @@ from types import TracebackType
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.client_session_classes.api_client_session import ApiClientSession
+from forecast.client_session_classes.extended_client_session import ExtendedClientSession
 from forecast.logging import logger_provider
 from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
@@ -25,7 +25,7 @@ class Provider(ABC):
         self._connector = connector
         self._api_key = api_key
 
-        self._session: ApiClientSession | None = None
+        self._session: ExtendedClientSession | None = None
 
         self.is_setup = False
         self.was_torn_down = False
@@ -45,7 +45,7 @@ class Provider(ABC):
             )
             return
 
-        self._session = ApiClientSession(self._base_url, self._api_key, self._connector)
+        self._session = ExtendedClientSession(self._base_url, self._connector)
         self.is_setup = True
 
     async def teardown(self) -> None:
@@ -69,7 +69,7 @@ class Provider(ABC):
         await self.teardown()
 
     @property
-    def session(self) -> ApiClientSession:
+    def session(self) -> ExtendedClientSession:
         if not self.is_setup or self._session is None:
             raise ValueError(
                 'The provider was never setup. Either manually call the setup method or use an async context manager'
@@ -86,7 +86,3 @@ class Provider(ABC):
         end_date: datetime,
     ) -> list[Weather]:
         ...
-
-    @property
-    def api_key(self) -> str | None:
-        return self._api_key

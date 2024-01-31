@@ -62,11 +62,10 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
         # * Providers init
         openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         meteostat = Meteostat(connector, config.data_sources.meteostat.api_key)
-        world_weather = WorldWeatherOnline(
-            connector, config.data_sources.world_weather_online.api_key
-        )
+        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
+        weather_bit = WeatherBit(connector, config.data_sources.weather_bit.api_key)
 
-        providers: list[Provider] = [openmeteo, meteostat, world_weather]
+        providers: list[Provider] = [openmeteo, meteostat, world_weather, weather_bit]
 
         # * Services init
         populate_cities_service = PopulateCitiesService(connector, session_factory)

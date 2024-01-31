@@ -28,7 +28,7 @@ class OpenMeteo(Provider):
         else:
             raise ValueError(...)
 
-        raw = await self.session.api_get(
+        raw = await self.session.get_json(
             '/archive',
             params={
                 'latitude': coordinate.latitude,

@@ -29,7 +29,7 @@ class WeatherBit(Provider):
     ) -> List[Weather]:
         granularity_string = GRANULARITY_TO_STRING[granularity]
 
-        raw = await self.session.api_get(
+        raw = await self.session.get_json(
             f'/history/{granularity_string}',
             params={
                 'lat': coordinate.latitude,

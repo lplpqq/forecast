@@ -9,6 +9,7 @@ from forecast.providers.base import Provider
 from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
 
+
 BASE_URL = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata'
 
 
@@ -25,7 +26,7 @@ class VisualCrossing(Provider):
     ) -> list[Weather]:
         aggregate_hours = granularity.value
 
-        raw = await self.session.api_get(
+        raw = await self.session.get_json(
             '/history',
             params={
                 'aggregateHours': aggregate_hours,
@@ -45,11 +46,8 @@ class VisualCrossing(Provider):
                 apparent_temperature=weather['feelslike'],
                 pressure=weather['sealevelpressure'],  # note it's a sea level pressure
                 wind_speed=weather['wspd'],
-                wind_gust_speed=weather['wspd']
-                if weather['wgust'] is None
-                else weather[
-                    'wgust'
-                ],  # May be empty if it is not significantly higher than the wind speed
+                wind_gust_speed=weather['wspd'] if weather['wgust'] is None else weather['wgust'],
+                # May be empty if it is not significantly higher than the wind speed
                 wind_direction=weather['wdir'],
                 humidity=weather['humidity'],
                 clouds=weather['cloudcover'],

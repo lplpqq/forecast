@@ -21,7 +21,7 @@ class WorldWeatherOnline(Provider):
         start_date: datetime,
         end_date: datetime,
     ) -> list[Weather]:
-        raw = await self.session.api_get(
+        raw = await self.session.get_json(
             '/past-weather.ashx',
             params={
                 'q': f'{coordinate.latitude},{coordinate.longitude}',
