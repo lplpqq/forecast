@@ -5,7 +5,6 @@ import aiohttp
 from yarl import URL
 
 from forecast.client_session_classes.extended_client_session import (
-    CompressionType,
     ExtendedClientSession,
     JsonData,
 )

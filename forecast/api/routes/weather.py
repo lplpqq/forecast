@@ -1,16 +1,22 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
 from forecast.api.dependencies import InjectedDBSesssion
+from forecast.api.dependencies.closest_city_provider import ClosestCityProvider
 from forecast.api.models.weather import WeatherData, WeatherResponse
-from forecast.db.models import WeatherJournal
+from forecast.db.models import City, WeatherJournal
+from forecast.logging import logger_provider
 
 router = APIRouter(prefix='/weather')
 
 
 PAGE_SIZE = 500
+
+
+logger = logger_provider(__name__)
+closest_city_provider = ClosestCityProvider()
 
 
 @router.get('/')
@@ -19,11 +25,14 @@ async def get_weather(
     from_date: datetime = Query(alias='from'),
     to_date: datetime = Query(alias='to'),
     cursor_id: int = Query(default=0),
+    city: City = Depends(closest_city_provider),
 ) -> WeatherResponse:
-    if from_date.timestamp() > to_date.timestamp():
+    if from_date > to_date:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail='from should be eariler in time to'
         )
+
+    logger.info(f'Fetching feather data for: {city.name}')
 
     # TODO: group by and average. Try to implement media, use average if isn't going to work
     history_request = (
@@ -33,8 +42,11 @@ async def get_weather(
         .where(
             WeatherJournal.date >= from_date,
             WeatherJournal.date <= to_date,
+            City.latitude == city.latitude,
+            City.longitude == city.longitude,
             WeatherJournal.id >= cursor_id,
         )
+        .join(City)
         .order_by(WeatherJournal.date)
         .limit(PAGE_SIZE)
     )

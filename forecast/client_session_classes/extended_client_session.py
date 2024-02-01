@@ -1,7 +1,4 @@
 import asyncio
-import gc
-import gzip
-import json
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager

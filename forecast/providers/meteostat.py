@@ -5,12 +5,8 @@ from __future__ import annotations
 import asyncio
 import gzip
 import io
-import json
-import os
 import time
-from asyncio import Task
 from datetime import datetime
-from itertools import repeat
 from pathlib import Path
 from typing import Any, Final, Literal, NewType, TypeAlias, cast
 
@@ -155,8 +151,9 @@ class Meteostat(Provider):
             if len(content) == 0:
                 raise ValueError('Nothing got returned from the API')
 
-            with gzip.open(self._stations_cache_file, 'w+', encoding='utf-8') as file:
-                json.dump(content, file)
+            with open(self._stations_cache_file, 'w+', encoding='utf-8') as file:
+                content = gzip.decompress(content)
+                file.write(content.decode('utf-8'))
 
         stations = orjson.loads(content)
 

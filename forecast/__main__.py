@@ -7,20 +7,12 @@ from datetime import datetime
 from typing import Protocol
 
 import aiohttp
-import uvicorn
-from fastapi import FastAPI
-from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
 from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
 from forecast.parse_args import create_parser, parse_args
-from forecast.providers import (
-    OpenMeteo,
-    VisualCrossing,
-    WeatherBit,
-    WorldWeatherOnline,
-)
+from forecast.providers import OpenMeteo, WorldWeatherOnline
 from forecast.providers.base.provider import Provider
 from forecast.providers.enums import Granularity
 from forecast.providers.meteostat import Meteostat

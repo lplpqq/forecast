@@ -4,15 +4,14 @@ scrap all info and put into database
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from datetime import datetime, timedelta
+from datetime import datetime
 from itertools import islice
 from typing import Any
 
 import aiohttp
-from pydantic_extra_types.coordinate import Coordinate
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from tenacity import after_log, retry, retry_if_exception_type, stop_after_attempt
+from tenacity import retry, retry_if_exception_type, stop_after_attempt
 
 from forecast.db.models import City, WeatherJournal
 from forecast.providers.base import Provider
