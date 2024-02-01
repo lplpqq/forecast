@@ -21,19 +21,7 @@ class OpenWeartherMapSourceConfig(BaseDataSourceConfig):
     ...
 
 
-class VisualCrossingSourceConfig(BaseDataSourceConfig):
-    ...
-
-
-class TomorrowSourceConfig(BaseDataSourceConfig):
-    ...
-
-
 class WorldWeatherOnlineSourceConfig(BaseDataSourceConfig):
-    ...
-
-
-class MeteostatSourceConfig(BaseDataSourceConfig):
     ...
 
 
@@ -44,10 +32,7 @@ class OpenMeteoSourceConfig(BaseDataSourceConfig):
 class SourcesConfig(BaseModel):
     weather_bit: WeatherBitSourceConfig
     open_weather_map: OpenWeartherMapSourceConfig
-    visual_crossing: VisualCrossingSourceConfig
-    tomorrow: TomorrowSourceConfig
     world_weather_online: WorldWeatherOnlineSourceConfig
-    meteostat: MeteostatSourceConfig
     open_meteo: OpenMeteoSourceConfig
 
 

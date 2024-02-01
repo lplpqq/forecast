@@ -20,7 +20,6 @@ from forecast.providers import (
     WorldWeatherOnline,
 )
 from forecast.providers.base.provider import Provider
-from forecast.providers.enums import Granularity
 from forecast.providers.meteostat import Meteostat
 from forecast.services import CollectorService, PopulateCitiesService
 
@@ -60,12 +59,11 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
 
     async with aiohttp.TCPConnector() as connector:
         # * Providers init
-        openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
-        meteostat = Meteostat(connector, config.data_sources.meteostat.api_key)
+        #openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
+        meteostat = Meteostat(connector, event_loop=event_loop)
         world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
-        weather_bit = WeatherBit(connector, config.data_sources.weather_bit.api_key)
-
-        providers: list[Provider] = [openmeteo, meteostat, world_weather, weather_bit]
+        #weather_bit = WeatherBit(connector, config.data_sources.weather_bit.api_key)
+        visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         # * Services init
         populate_cities_service = PopulateCitiesService(connector, session_factory)
@@ -73,11 +71,10 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
         collector_service = CollectorService(
             connector,
             session_factory,
-            datetime(2015, 1, 1),
-            datetime(2016, 1, 1),
-            providers,
+            datetime(2019, 1, 1),
+            datetime(2020, 1, 1),
+            [meteostat, world_weather, visual_crossing],
             event_loop,
-            Granularity.HOUR,
         )
 
         services = [populate_cities_service, collector_service]
@@ -85,91 +82,6 @@ async def main(event_loop: asyncio.AbstractEventLoop) -> None:
         async with orchestrate_anything(*services):
             await populate_cities_service.run()
             await collector_service.run()
-
-        # location = Coordinate(
-        #     latitude=Latitude(
-        #         52.1652366,
-        #     ),
-        #     longitude=Longitude(20.8647919),
-        # )
-
-        # openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
-        # meteostat = Meteostat(connector, config.data_sources.meteostat.api_key)
-        # world_weather = WorldWeatherOnline(
-        #     connector, config.data_sources.world_weather_online.api_key
-        # )
-
-        # TODO: Convert all of this mumbo-jumbo into a service
-        # async with orchestrate_anything(openmeteo, meteostat, world_weather):
-        #     world_weather_data = await world_weather.get_historical_weather(
-        #         Granularity.HOUR,
-        #         location,
-        #         start_date=datetime(2024, 1, 5),
-        #         end_date=datetime(2024, 1, 15),
-        #     )
-
-        #     meteostat_data = await meteostat.get_historical_weather(
-        #         Granularity.HOUR,
-        #         Coordinate(latitude=Latitude(35.6897), longitude=Longitude(139.6922)),
-        #         start_date=datetime(2010, 1, 5),
-        #         end_date=datetime(2024, 1, 15),
-        #     )
-
-        #     openmeteo_data = await openmeteo.get_historical_weather(
-        #         Granularity.HOUR,
-        #         location,
-        #         start_date=datetime(2024, 1, 5),
-        #         end_date=datetime(2024, 1, 15),
-        #     )
-
-        # weatherbit = WeatherBit(connector, config.data_sources.weather_bit.api_key)
-        # weatherbit_data = await weatherbit.get_historical_weather(
-        #     Granularity.HOUR,
-        #     location,
-        #     start_date=datetime(2024, 1, 5),
-        #     end_date=datetime(2024, 1, 15)
-        # )
-
-        # tomorrow = Tomorrow(connector, config.data_sources.tomorrow.api_key)
-        # tomorrow_data = await tomorrow.get_historical_weather(
-        #     Granularity.HOUR,
-        #     location,
-        #     start_date=datetime(2024, 1, 5),
-        #     end_date=datetime(2024, 1, 15)
-        # )
-
-        # openweathermap = OpenWeatherMap(connector, config.data_sources.open_weather_map.api_key)
-        # openweathermap_data = await openweathermap.get_historical_weather(
-        #     Granularity.HOUR,
-        #     location,
-        #     start_date=datetime(2024, 1, 5),
-        #     end_date=datetime(2024, 1, 15)
-        # )
-
-        # visualcrossing = VisualCrossing(connector, config.data_sources.visual_crossing.api_key)
-        # visualcrossing_data = await visualcrossing.get_historical_weather(
-        #     Granularity.HOUR,
-        #     location,
-        #     start_date=datetime(2024, 1, 5),
-        #     end_date=datetime(2024, 1, 15),
-        # )
-
-        # for world_weather_, meteostat_, weathebit_, openmeteo_, tomorrow_, openweathermap_, visualcrossing_ in zip(
-        #         world_weather_data, meteostat_data, weatherbit_data, openmeteo_data, tomorrow_data, openweathermap_data,
-        #         visualcrossing_data
-        # ):
-        # for world_weather_, meteostat_, openmeteo_ in islice(
-        #     zip(world_weather_data, meteostat_data, openmeteo_data), 5
-        # ):
-        #     print(world_weather_)
-        #     print(meteostat_)
-        #     print(openmeteo_)
-
-        #     # print(weathebit_)
-        #     # print(tomorrow_)
-        #     # print(openweathermap_)
-        #     # print(visualcrossing_)
-        #     print()
 
     end = time.perf_counter()
     logger.info(f'Time taken - {(end - start) * 1000:.2f}ms')

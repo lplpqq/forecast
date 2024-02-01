@@ -19,19 +19,17 @@ class WeatherJournal(Base):
     __tablename__ = 'weather_journal'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    data_source: Mapped[str] = mapped_column()
 
+    data_source: Mapped[str] = mapped_column()
     date: Mapped[datetime] = mapped_column(DateTime)
     temperature: Mapped[float] = mapped_column()
-    apparent_temperature: Mapped[float] = mapped_column(nullable=True)
     pressure: Mapped[float] = mapped_column()
     wind_speed: Mapped[float] = mapped_column()
-    wind_gust_speed: Mapped[float] = mapped_column()
     wind_direction: Mapped[float] = mapped_column()
     humidity: Mapped[float] = mapped_column()
     clouds: Mapped[float] = mapped_column(nullable=True)
     precipitation: Mapped[float] = mapped_column()
-    snow: Mapped[float] = mapped_column()
+    snow: Mapped[float] = mapped_column(nullable=True)
 
     city_id: Mapped[int] = mapped_column(ForeignKey('city.id'))
     city: Mapped[City] = relationship(
@@ -39,5 +37,17 @@ class WeatherJournal(Base):
     )
 
     @classmethod
-    def from_weather_tuple(cls, base: Weather, city_id: int) -> Self:
-        return cls(**base._asdict(), city_id=city_id)
+    def from_weather_tuple(cls, weather: Weather, city_id: int) -> Self:
+        return cls(
+            data_source=weather.data_source,
+            date=weather.date,
+            temperature=weather.temperature,
+            pressure=weather.pressure,
+            wind_speed=weather.wind_speed,
+            wind_direction=weather.wind_direction,
+            humidity=weather.humidity,
+            clouds=weather.clouds,
+            precipitation=weather.precipitation,
+            snow=weather.snow,
+            city_id=city_id
+        )

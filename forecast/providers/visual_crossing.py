@@ -1,66 +1,78 @@
 # api docs https://www.visualcrossing.com/resources/documentation/weather-api/weather-api-documentation/
-
-from datetime import datetime
+import asyncio
+import itertools
+from asyncio import AbstractEventLoop
+from datetime import datetime, timedelta
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.providers.base import Provider
-from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
 
-
-BASE_URL = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata'
+BASE_URL = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services'
 
 
 class VisualCrossing(Provider):
-    def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None) -> None:
-        super().__init__(BASE_URL, conn, api_key)
+    def __init__(self, conn: aiohttp.BaseConnector, event_loop: AbstractEventLoop) -> None:
+        super().__init__(BASE_URL, conn, event_loop=event_loop)
 
-    async def get_historical_weather(
-        self,
-        granularity: Granularity,
-        coordinate: Coordinate,
-        start_date: datetime,
-        end_date: datetime,
+    async def _get_historical_weather_chunk(
+            self,
+            coordinate: Coordinate,
+            start_date: datetime,
+            end_date: datetime
     ) -> list[Weather]:
-        aggregate_hours = granularity.value
+        time_frame = (f'{start_date.strftime("%Y-%m-%d")}/'
+                      f'{min((start_date + timedelta(days=1)), end_date).strftime("%Y-%m-%d")}')
 
-        raw = await self.session.get_json(
-            '/history',
+        resp = await self.session.get_json(
+            f'/timeline/{coordinate.latitude},{coordinate.longitude}/{time_frame}',
             params={
-                'aggregateHours': aggregate_hours,
-                'location': f'{coordinate.latitude},{coordinate.longitude}',
-                'startDateTime': start_date.isoformat(),
-                'endDateTime': end_date.isoformat(),
+                'unitGroup': 'metric',
+                'key': 'ZMM2U9XUSJ6UV37L4L49NQACY',
+                'options': 'preview',
                 'contentType': 'json',
-                'key': self.api_key,
+            },
+            headers={
+                'referer': 'https://www.visualcrossing.com/'
             },
         )
 
-        return [
-            Weather(
-                data_source=self.name,
-                date=datetime.fromtimestamp(weather['datetime']),
-                temperature=weather['temp'],
-                apparent_temperature=weather['feelslike'],
-                pressure=weather['sealevelpressure'],  # note it's a sea level pressure
-                wind_speed=weather['wspd'],
-                wind_gust_speed=weather['wspd'] if weather['wgust'] is None else weather['wgust'],
-                # May be empty if it is not significantly higher than the wind speed
-                wind_direction=weather['wdir'],
-                humidity=weather['humidity'],
-                clouds=weather['cloudcover'],
-                precipitation=float(weather['precip']),
-                snow=weather['snow'],
-            )
-            for weather in raw['locations'][next(iter(raw['locations']))]['values']
-        ]
+        data = []
+        for day_data in resp['days']:
+            day = day_data['datetime']
+            for hour_data in day_data['hours']:
+                hour = hour_data["datetime"]
+                data.append(Weather(
+                    data_source=self.name,
+                    date=datetime.strptime(f'{day} {hour}', "%Y-%m-%d %H:%M:%S"),
+                    temperature=hour_data['temp'],
+                    pressure=hour_data['pressure'],
+                    wind_speed=hour_data['windspeed'],
+                    wind_direction=hour_data['winddir'],
+                    humidity=hour_data['humidity'],
+                    clouds=hour_data['cloudcover'],
+                    precipitation=hour_data['precip'],
+                    snow=hour_data['snow']
+                ))
+        return data
 
-    @property
-    def api_key(self) -> str | None:
-        return self._api_key
+    async def get_historical_weather(
+            self,
+            coordinate: Coordinate,
+            start_date: datetime,
+            end_date: datetime,
+    ) -> list[Weather]:
+        tasks = []
+        while start_date < end_date:
+            tasks.append(self._event_loop.create_task(
+                self._get_historical_weather_chunk(
+                    coordinate,
+                    start_date,
+                    end_date
+                )
+            ))
+            start_date += timedelta(days=2)
 
-    @property
-    def base_url(self) -> str:
-        return self._base_url
+        return list(itertools.chain.from_iterable(await asyncio.gather(*tasks)))

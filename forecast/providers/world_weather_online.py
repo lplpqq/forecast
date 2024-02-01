@@ -4,7 +4,6 @@ import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.providers.base import Provider
-from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
 
 BASE_URL = 'https://api.worldweatheronline.com/premium/v1'
@@ -16,7 +15,6 @@ class WorldWeatherOnline(Provider):
 
     async def get_historical_weather(
         self,
-        granularity: Granularity,
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
@@ -27,7 +25,7 @@ class WorldWeatherOnline(Provider):
                 'q': f'{coordinate.latitude},{coordinate.longitude}',
                 'date': start_date.strftime('%Y-%m-%d'),
                 'enddate': end_date.strftime('%Y-%m-%d'),
-                'tp': granularity.value,
+                'tp': 1,
                 'format': 'json',
                 'key': self._api_key,
             },
@@ -43,13 +41,9 @@ class WorldWeatherOnline(Provider):
                         data_source=self.name,
                         date=day_time + timedelta(hours=int(hour['time']) // 100),
                         temperature=float(hour['tempC']),
-                        apparent_temperature=float(hour['FeelsLikeC']),
                         pressure=int(hour['pressure']),
                         wind_speed=round(
                             (float(hour['windspeedKmph']) / 3.6), 2
-                        ),  # converts km/h to m/s
-                        wind_gust_speed=round(
-                            float(hour['WindGustKmph']) / 3.6, 2
                         ),  # converts km/h to m/s
                         wind_direction=int(hour['winddirDegree']),
                         humidity=int(hour['humidity']),
