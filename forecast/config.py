@@ -40,9 +40,15 @@ class DBConfig(BaseModel):
     connection_string: str
 
 
+class APIConfig(BaseModel):
+    port: int
+    host: str
+
+
 class Config(BaseConfig):
     data_sources: SourcesConfig
     db: DBConfig
+    api: APIConfig
 
 
 BASE_CONFIG_FOLDER = Path('./config/')

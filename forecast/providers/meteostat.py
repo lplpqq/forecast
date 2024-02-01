@@ -119,8 +119,9 @@ class Meteostat(Provider):
             if len(content) == 0:
                 raise ValueError('Nothing got returned from the API')
 
-            with gzip.open(self._stations_cache_file, 'w+', encoding='utf-8') as file:
-                json.dump(content, file)
+            with open(self._stations_cache_file, 'w+', encoding='utf-8') as file:
+                content = gzip.decompress(content)
+                file.write(content.decode('utf-8'))
 
         stations = orjson.loads(content)
 

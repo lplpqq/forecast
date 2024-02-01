@@ -10,7 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from forecast.db.models.base import Base
 from forecast.providers.models import Weather
 
-
 if typing.TYPE_CHECKING:
     from forecast.db.models.city import City
 
@@ -32,9 +31,7 @@ class WeatherJournal(Base):
     snow: Mapped[float] = mapped_column(nullable=True)
 
     city_id: Mapped[int] = mapped_column(ForeignKey('city.id'))
-    city: Mapped[City] = relationship(
-        back_populates='hourly_history'
-    )
+    city: Mapped[City] = relationship(back_populates='hourly_history')
 
     @classmethod
     def from_weather_tuple(cls, weather: Weather, city_id: int) -> Self:

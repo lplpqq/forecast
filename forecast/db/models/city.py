@@ -23,9 +23,7 @@ class City(Base):
     country_name: Mapped[str] = mapped_column()
     population: Mapped[int] = mapped_column()
 
-    hourly_history: Mapped[list[WeatherJournal]] = relationship(
-        back_populates='city'
-    )
+    hourly_history: Mapped[list[WeatherJournal]] = relationship(back_populates='city')
 
     @classmethod
     def from_city_named_tuple(cls, data: CityTuple) -> Self:
