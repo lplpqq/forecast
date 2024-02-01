@@ -12,10 +12,9 @@ from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
 from forecast.parse_args import create_parser, parse_args
-from forecast.providers import OpenMeteo, WorldWeatherOnline, VisualCrossing
+from forecast.providers import VisualCrossing, WorldWeatherOnline
 from forecast.providers.meteostat import Meteostat
 from forecast.services import CollectorService, PopulateCitiesService
-
 
 logger = logger_provider(__name__)
 
@@ -55,9 +54,11 @@ async def run_gather(
 
     async with aiohttp.TCPConnector() as connector:
         # * Providers init
-        openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
+        # openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         meteostat = Meteostat(connector, event_loop=event_loop)
-        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
+        world_weather = WorldWeatherOnline(
+            connector, config.data_sources.world_weather_online.api_key
+        )
         visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         # * Services init
@@ -68,7 +69,8 @@ async def run_gather(
             session_factory,
             start_date,
             end_date,
-            [openmeteo, meteostat, world_weather, visual_crossing],
+            # [openmeteo, meteostat, world_weather, visual_crossing],
+            [meteostat, world_weather, visual_crossing],
             event_loop,
         )
 
@@ -82,8 +84,8 @@ async def run_gather(
     logger.info(f'Time taken - {end - start}')
 
 
-START_DATE = datetime(2015, 1, 1)
-END_DATE = datetime(2016, 1, 1)
+START_DATE = datetime(2020, 1, 1)
+END_DATE = datetime(2021, 1, 1)
 
 
 async def main(event_loop: asyncio.AbstractEventLoop) -> None:

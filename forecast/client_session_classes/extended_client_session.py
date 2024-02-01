@@ -9,7 +9,6 @@ from yarl import URL
 
 from forecast.logging import logger_provider
 
-
 JsonData: TypeAlias = dict[Any, Any]
 
 

@@ -1,13 +1,14 @@
-import asyncio
-from asyncio import AbstractEventLoop
 from abc import ABC, abstractmethod
+from asyncio import AbstractEventLoop
 from datetime import datetime
 from types import TracebackType
 
 from aiohttp import BaseConnector
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.client_session_classes.extended_client_session import ExtendedClientSession
+from forecast.client_session_classes.extended_client_session import (
+    ExtendedClientSession,
+)
 from forecast.logging import logger_provider
 from forecast.providers.models import Weather
 from forecast.utils import pascal_case_to_snake_case
@@ -20,7 +21,7 @@ class Provider(ABC):
         connector: BaseConnector,
         api_key: str | None = None,
         *,
-        event_loop: AbstractEventLoop = None
+        event_loop: AbstractEventLoop = None,
     ) -> None:
         self.logger = logger_provider(__name__)
 

@@ -10,10 +10,7 @@ from forecast.config import Config
 
 def create_engine(from_config: Config) -> AsyncEngine:
     engine = create_async_engine(
-        from_config.db.connection_string,
-        echo=False,
-        pool_size=20,
-        max_overflow=0
+        from_config.db.connection_string, echo=False, pool_size=100, max_overflow=0
     )
 
     return engine

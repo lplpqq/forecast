@@ -1,12 +1,11 @@
 from datetime import datetime
-from typing import List, Literal
+from typing import List
 
 import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.providers.base import Provider
 from forecast.providers.models import Weather
-
 
 BASE_URL = 'https://api.weatherbit.io/v2.0/'
 
@@ -22,7 +21,7 @@ class WeatherBit(Provider):
         end_date: datetime,
     ) -> List[Weather]:
         raw = await self.session.get_json(
-            f'/history/hourly',
+            '/history/hourly',
             params={
                 'lat': coordinate.latitude,
                 'lon': coordinate.longitude,

@@ -20,14 +20,14 @@ class WeatherJournal(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     data_source: Mapped[str] = mapped_column()
-    date: Mapped[datetime] = mapped_column(DateTime)
-    temperature: Mapped[float] = mapped_column()
+    date: Mapped[datetime] = mapped_column(DateTime, index=True)
+    temperature: Mapped[float] = mapped_column(index=True)
     pressure: Mapped[float] = mapped_column()
     wind_speed: Mapped[float] = mapped_column()
     wind_direction: Mapped[float] = mapped_column()
     humidity: Mapped[float] = mapped_column()
     clouds: Mapped[float] = mapped_column(nullable=True)
-    precipitation: Mapped[float] = mapped_column()
+    precipitation: Mapped[float] = mapped_column(index=True)
     snow: Mapped[float] = mapped_column(nullable=True)
 
     city_id: Mapped[int] = mapped_column(ForeignKey('city.id'))
@@ -46,5 +46,5 @@ class WeatherJournal(Base):
             clouds=weather.clouds,
             precipitation=weather.precipitation,
             snow=weather.snow,
-            city_id=city_id
+            city_id=city_id,
         )

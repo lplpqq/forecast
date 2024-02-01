@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import gzip
 import io
-import json
 import time
 from datetime import datetime
 from pathlib import Path
@@ -22,7 +21,6 @@ from scipy.spatial import distance
 from forecast.providers.base import Provider
 from forecast.providers.models import Weather
 from lib.fs_utils import format_path, validate_path
-
 
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
@@ -112,9 +110,7 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            content = await self.session.get_raw(
-                '/stations/lite.json.gz'
-            )
+            content = await self.session.get_raw('/stations/lite.json.gz')
 
             if len(content) == 0:
                 raise ValueError('Nothing got returned from the API')
@@ -125,14 +121,16 @@ class Meteostat(Provider):
 
         stations = orjson.loads(content)
 
-        self._stations_df = pd.DataFrame([
-            {
-                'id': station['id'],
-                'latitude': station['location']['latitude'],
-                'longitude': station['location']['longitude']
-            }
-            for station in stations
-        ])
+        self._stations_df = pd.DataFrame(
+            [
+                {
+                    'id': station['id'],
+                    'latitude': station['location']['latitude'],
+                    'longitude': station['location']['longitude'],
+                }
+                for station in stations
+            ]
+        )
 
         self._stations_coordinates = cast(
             FloatsArray, self._stations_df[['latitude', 'longitude']].values
@@ -145,8 +143,7 @@ class Meteostat(Provider):
 
         start = time.perf_counter()
         closest = distance.cdist(
-            np.array([(point.latitude, point.longitude)]),
-            self._stations_coordinates
+            np.array([(point.latitude, point.longitude)]), self._stations_coordinates
         )
         end = time.perf_counter()
 
@@ -164,9 +161,12 @@ class Meteostat(Provider):
             f'/hourly/{year}/{station_id}.csv.gz'
         )
 
-        df = pd.read_csv(io.BytesIO(compressed_data), names=DEFAULT_CSV_NAMES, compression='gzip')
-        df['date'] = pd.to_datetime(df['date'] + ' ' + df['hour'].astype(str).str.zfill(2),
-                                    format="%Y-%m-%d %H")
+        df = pd.read_csv(
+            io.BytesIO(compressed_data), names=DEFAULT_CSV_NAMES, compression='gzip'
+        )
+        df['date'] = pd.to_datetime(
+            df['date'] + ' ' + df['hour'].astype(str).str.zfill(2), format='%Y-%m-%d %H'
+        )
 
         return df.drop(['hour'], axis=1)
 
@@ -180,15 +180,15 @@ class Meteostat(Provider):
         start = time.perf_counter()
         for year in range(start_date.year, end_date.year + 1):
             fetch_task = self._event_loop.create_task(
-                self._fetch_data_for_year(
-                    station_id, year
-                )
+                self._fetch_data_for_year(station_id, year)
             )
             fetch_tasks.append(fetch_task)
 
         results = await asyncio.gather(*fetch_tasks)
         end = time.perf_counter()
-        self.logger.debug(f'Took to gather and parse {len(results)} CSV file(s): {end - start}')
+        self.logger.debug(
+            f'Took to gather and parse {len(results)} CSV file(s): {end - start}'
+        )
 
         concatenated_df = pd.concat(results)
         # * Reordering the table columns
@@ -210,7 +210,9 @@ class Meteostat(Provider):
             ]
         ]
 
-        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(2)  # converts km/h to m/s
+        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(
+            2
+        )  # converts km/h to m/s
 
         return concatenated_df
 

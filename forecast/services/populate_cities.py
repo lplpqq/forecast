@@ -13,7 +13,6 @@ from forecast.services.base import MininalServiceWithEverything
 from forecast.services.models import CityTuple
 from lib.fs_utils import validate_path
 
-
 CACHE_FOLDER: Final[Path] = Path('./.cache')
 CITIES_CACHE_FILE: Final[Path] = CACHE_FOLDER.joinpath('./cities/cities.csv')
 
@@ -41,8 +40,10 @@ class PopulateCitiesService(MininalServiceWithEverything):
         )
 
         if CITIES_CACHE_FILE.exists():
-            df = pd.read_csv(CITIES_CACHE_FILE,
-                             usecols=['city', 'lat', 'lng', 'country', 'population'])
+            df = pd.read_csv(
+                CITIES_CACHE_FILE,
+                usecols=['city', 'lat', 'lng', 'country', 'population'],
+            )
             return df
 
         archive = await self._aiohttp_session.get_raw(
@@ -69,18 +70,16 @@ class PopulateCitiesService(MininalServiceWithEverything):
 
     async def populate_cities(self) -> None:
         async with self._db_session_factory() as session:
-            present_locations = set((await session.execute(
-                select(City.latitude, City.longitude)
-            )).all())
+            present_locations = set(
+                (await session.execute(select(City.latitude, City.longitude))).all()
+            )
 
             for row in self._cities_df.itertuples(index=False):
                 city_tuple = CityTuple._make(row)
                 if (city_tuple.latitude, city_tuple.longitude) in present_locations:
                     continue
 
-                session.add(
-                    City.from_city_named_tuple(city_tuple)
-                )
+                session.add(City.from_city_named_tuple(city_tuple))
 
             await session.commit()
 
