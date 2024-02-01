@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 import gzip
 import io
+import json
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Final, Literal, NewType, TypeAlias, cast
+from typing import Any, Final, NewType, TypeAlias, cast
 
 import aiohttp
 import numpy as np
@@ -19,9 +20,9 @@ from pydantic_extra_types.coordinate import Coordinate
 from scipy.spatial import distance
 
 from forecast.providers.base import Provider
-from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
 from lib.fs_utils import format_path, validate_path
+
 
 ROOT_CACHE_FOLDER: Final[Path] = Path('./.cache')
 METEOSTAT_CACHE_FOLDER: Final[Path] = ROOT_CACHE_FOLDER.joinpath('./meteostat/')
@@ -30,17 +31,6 @@ STATIONS_CACHE_FOLDER: Final[Path] = METEOSTAT_CACHE_FOLDER.joinpath('./stations
 FloatsArray: TypeAlias = npt.NDArray[np.float64]
 
 StationId = NewType('StationId', str)
-CacheKey: TypeAlias = tuple[StationId, int]
-CacheEntry: TypeAlias = pd.DataFrame
-
-
-DEFAULT_CACHE_SIZE = 100
-
-GRANULARITY_TO_STRING: Final[dict[Granularity, Literal['hourly', 'daily']]] = {
-    Granularity.HOUR: 'hourly',
-    Granularity.DAY: 'daily',
-}
-
 
 # https://dev.meteostat.net/api/stations/hourly.html#response
 # CSV file contents:
@@ -75,40 +65,16 @@ DEFAULT_CSV_NAMES = (
 )
 
 
-def parse_year_data(task_result: bytes) -> pd.DataFrame:
-    df = pd.read_csv(
-        io.BytesIO(task_result),
-        names=DEFAULT_CSV_NAMES,
-        parse_dates=['date'],
-        compression='gzip',
-    )
-
-    return df
-
-
-def _generate_endpoint_path(
-    granularity: Granularity, station: str, year: int | None = None
-) -> str:
-    path = f'/{GRANULARITY_TO_STRING[granularity]}/'
-
-    if granularity is Granularity.HOUR and year:
-        path += f'{year}/'
-
-    return f'{path}{station}.csv.gz'
-
-
 BASE_URL = 'https://bulk.meteostat.net/v2'
 
 
 class Meteostat(Provider):
-    def __init__(self, conn: aiohttp.BaseConnector, api_key: str | None = None) -> None:
-        super().__init__(BASE_URL, conn, api_key)
-
-        self._event_loop = asyncio.get_event_loop()
+    def __init__(self, conn: aiohttp.BaseConnector, **kwargs) -> None:
+        super().__init__(BASE_URL, conn, **kwargs)
 
         self._stations_cache_file = STATIONS_CACHE_FOLDER.joinpath('./list-lite.json')
-        self._stations_df: None | pd.DataFrame = None
-        self._stations_coordinates: None | FloatsArray = None
+        self._stations_df: pd.DataFrame | None = None
+        self._stations_coordinates: FloatsArray | None = None
 
         validate_path(
             self._stations_cache_file,
@@ -146,7 +112,9 @@ class Meteostat(Provider):
             )
 
             self.logger.info('Fetching the stations list')
-            content = await self.session.get_file('/stations/lite.json.gz')
+            content = await self.session.get_raw(
+                '/stations/lite.json.gz'
+            )
 
             if len(content) == 0:
                 raise ValueError('Nothing got returned from the API')
@@ -157,24 +125,14 @@ class Meteostat(Provider):
 
         stations = orjson.loads(content)
 
-        latitudes: list[float] = []
-        longitudes: list[float] = []
-        ids: list[str] = []
-
-        for station in stations:
-            ids.append(station['id'])
-
-            location = station['location']
-            latitudes.append(location['latitude'])
-            longitudes.append(location['longitude'])
-
-        self._stations_df = pd.DataFrame.from_dict(
+        self._stations_df = pd.DataFrame([
             {
-                'id': ids,
-                'latitude': latitudes,
-                'longitude': longitudes,
+                'id': station['id'],
+                'latitude': station['location']['latitude'],
+                'longitude': station['location']['longitude']
             }
-        )
+            for station in stations
+        ])
 
         self._stations_coordinates = cast(
             FloatsArray, self._stations_df[['latitude', 'longitude']].values
@@ -187,7 +145,8 @@ class Meteostat(Provider):
 
         start = time.perf_counter()
         closest = distance.cdist(
-            np.array([(point.latitude, point.longitude)]), self._stations_coordinates
+            np.array([(point.latitude, point.longitude)]),
+            self._stations_coordinates
         )
         end = time.perf_counter()
 
@@ -198,13 +157,18 @@ class Meteostat(Provider):
         index = closest.argmin()
         return StationId(self._stations_df.iloc[index]['id'])
 
-    async def _fetch_compressed_data_for_year(
-        self, granularity: Granularity, station_id: StationId, year: int
-    ) -> bytes:
-        endpoint = _generate_endpoint_path(granularity, station_id, year)
-        compressed_data = await self.session.get_file(endpoint)
+    async def _fetch_data_for_year(
+        self, station_id: StationId, year: int
+    ) -> pd.DataFrame:
+        compressed_data = await self.session.get_raw(
+            f'/hourly/{year}/{station_id}.csv.gz'
+        )
 
-        return compressed_data
+        df = pd.read_csv(io.BytesIO(compressed_data), names=DEFAULT_CSV_NAMES, compression='gzip')
+        df['date'] = pd.to_datetime(df['date'] + ' ' + df['hour'].astype(str).str.zfill(2),
+                                    format="%Y-%m-%d %H")
+
+        return df.drop(['hour'], axis=1)
 
     async def get_for_station(
         self,
@@ -213,25 +177,22 @@ class Meteostat(Provider):
         end_date: datetime,
     ) -> pd.DataFrame:
         fetch_tasks = []
+        start = time.perf_counter()
         for year in range(start_date.year, end_date.year + 1):
             fetch_task = self._event_loop.create_task(
-                self._fetch_compressed_data_for_year(Granularity.HOUR, station_id, year)
+                self._fetch_data_for_year(
+                    station_id, year
+                )
             )
             fetch_tasks.append(fetch_task)
 
-        per_year_data = await asyncio.gather(*fetch_tasks)
-
-        start = time.perf_counter()
-        results = list(map(parse_year_data, per_year_data))
+        results = await asyncio.gather(*fetch_tasks)
         end = time.perf_counter()
-
-        self.logger.debug(f'Took to parse {len(results)} CSV file(s): {end - start}')
+        self.logger.debug(f'Took to gather and parse {len(results)} CSV file(s): {end - start}')
 
         concatenated_df = pd.concat(results)
-
-        # * Postprocessing
-        concatenated_df['apparent_temp'] = -1
-        concatenated_df['clouds'] = -1
+        # * Reordering the table columns
+        concatenated_df['clouds'] = None
         concatenated_df['data_source'] = self.name
 
         concatenated_df = concatenated_df[
@@ -239,10 +200,8 @@ class Meteostat(Provider):
                 'data_source',
                 'date',
                 'temp',
-                'apparent_temp',
                 'pres',
                 'wspd',
-                'wpgt',
                 'wdir',
                 'rhum',
                 'clouds',
@@ -251,25 +210,16 @@ class Meteostat(Provider):
             ]
         ]
 
-        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(
-            2
-        )  # converts km/h to m/s
-        concatenated_df['wpgt'] = (concatenated_df['wpgt'] / 3.6).round(
-            2
-        )  # converts km/h to m/s
+        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(2)  # converts km/h to m/s
 
-        concatenated_df.fillna(-1, inplace=True)
         return concatenated_df
 
     async def get_historical_weather(
         self,
-        granularity: Granularity,
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
     ) -> Any:
-        if granularity is not Granularity.HOUR:
-            raise ValueError(f'Unsupported granularity: {granularity.name}')
         nearest_station = self._find_nearest_station(coordinate)
 
         self.logger.debug(
@@ -281,12 +231,4 @@ class Meteostat(Provider):
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
         df = df.loc[mask]
 
-        return [Weather._make(tuple_) for tuple_ in df.itertuples(index=False)]
-
-    @property
-    def api_key(self) -> str | None:
-        return self._api_key
-
-    @property
-    def base_url(self) -> str:
-        return self._base_url
+        return [Weather._make(row) for row in df.itertuples(index=False)]

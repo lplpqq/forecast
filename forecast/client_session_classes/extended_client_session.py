@@ -2,15 +2,14 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal, Self, TypeAlias
+from typing import Any, Self, TypeAlias
 
 import aiohttp
 from yarl import URL
 
 from forecast.logging import logger_provider
 
-MethodType: TypeAlias = Literal['GET', 'POST']
-CompressionType: TypeAlias = Literal['gzip'] | None
+
 JsonData: TypeAlias = dict[Any, Any]
 
 
@@ -72,19 +71,16 @@ class ExtendedClientSession(aiohttp.ClientSession):
             response.raise_for_status()
             yield response
 
-    async def _request_json(
-        self, endpoint: str, *, method: MethodType, **kwargs: Any
+    async def get_json(
+        self,
+        endpoint: str,
+        **kwargs: Any,
     ) -> JsonData:
-        async with self._request_wrapper(method, endpoint, **kwargs) as response:
+        async with self._request_wrapper('GET', endpoint, **kwargs) as response:
             raw = await response.json()
-
-            # TODO: Provide a flag in the __init__?
-            # self.logger.debug('JSON data:')
-            # self.logger.debug(json.dumps(raw, indent=4))
-
             return raw
 
-    async def get_file(
+    async def get_raw(
         self,
         endpoint: str,
         **kwargs: Any,

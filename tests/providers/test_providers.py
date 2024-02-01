@@ -5,7 +5,6 @@ from aiohttp.client import TCPConnector
 from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
 from forecast.providers import OpenWeatherMap, VisualCrossing, WeatherBit
-from forecast.providers.enums import Granularity
 from tests.config import config
 
 
@@ -16,7 +15,6 @@ async def test_weatherbit(connector: TCPConnector) -> None:
     ) as weatherbit:
         print(
             await weatherbit.get_historical_weather(
-                Granularity.HOUR,
                 Coordinate(latitude=Latitude(35.6897), longitude=Longitude(139.6922)),
                 start_date=datetime(2024, 1, 5),
                 end_date=datetime(2024, 1, 15),
@@ -32,7 +30,6 @@ async def test_open_weather_map(connector: TCPConnector) -> None:
     ) as openweathermap:
         print(
             await openweathermap.get_historical_weather(
-                Granularity.HOUR,
                 Coordinate(latitude=Latitude(35.6897), longitude=Longitude(139.6922)),
                 start_date=datetime(2024, 1, 5),
                 end_date=datetime(2024, 1, 15),
@@ -48,7 +45,6 @@ async def test_visaul_crossing(connector: TCPConnector) -> None:
     ) as visualcrossing:
         print(
             await visualcrossing.get_historical_weather(
-                Granularity.HOUR,
                 Coordinate(latitude=Latitude(35.6897), longitude=Longitude(139.6922)),
                 start_date=datetime(2024, 1, 5),
                 end_date=datetime(2024, 1, 15),

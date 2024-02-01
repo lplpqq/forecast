@@ -4,17 +4,22 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from itertools import islice
 from typing import Protocol
 
 import aiohttp
+from pydantic_extra_types.coordinate import Coordinate, Latitude, Longitude
 
 from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
-from forecast.parse_args import create_parser, parse_args
-from forecast.providers import OpenMeteo, WorldWeatherOnline
+from forecast.providers import (
+    OpenMeteo,
+    VisualCrossing,
+    WeatherBit,
+    WorldWeatherOnline,
+)
 from forecast.providers.base.provider import Provider
-from forecast.providers.enums import Granularity
 from forecast.providers.meteostat import Meteostat
 from forecast.services import CollectorService, PopulateCitiesService
 
@@ -45,9 +50,7 @@ async def orchestrate_anything(
         )
 
 
-async def run_gather(
-    event_loop: asyncio.AbstractEventLoop, start_date: datetime, end_date: datetime
-) -> None:
+async def main(event_loop: asyncio.AbstractEventLoop) -> None:
     logger.info('Starting')
     start = time.perf_counter()
 
@@ -56,13 +59,11 @@ async def run_gather(
 
     async with aiohttp.TCPConnector() as connector:
         # * Providers init
-        openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
-        meteostat = Meteostat(connector, config.data_sources.meteostat.api_key)
-        world_weather = WorldWeatherOnline(
-            connector, config.data_sources.world_weather_online.api_key
-        )
-
-        providers: list[Provider] = [openmeteo, meteostat, world_weather]
+        #openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
+        meteostat = Meteostat(connector, event_loop=event_loop)
+        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
+        #weather_bit = WeatherBit(connector, config.data_sources.weather_bit.api_key)
+        visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         # * Services init
         populate_cities_service = PopulateCitiesService(connector, session_factory)
@@ -70,11 +71,10 @@ async def run_gather(
         collector_service = CollectorService(
             connector,
             session_factory,
-            start_date,
-            end_date,
-            providers,
+            datetime(2019, 1, 1),
+            datetime(2020, 1, 1),
+            [meteostat, world_weather, visual_crossing],
             event_loop,
-            Granularity.HOUR,
         )
 
         services = [populate_cities_service, collector_service]
@@ -84,26 +84,7 @@ async def run_gather(
             await collector_service.run()
 
     end = time.perf_counter()
-    logger.info(f'Time taken - {end - start}')
-
-
-START_DATE = datetime(2015, 1, 1)
-END_DATE = datetime(2016, 1, 1)
-
-
-async def main(event_loop: asyncio.AbstractEventLoop) -> None:
-    parser = create_parser()
-    args = parse_args(parser)
-
-    if args.initial_run:
-        delta = END_DATE - START_DATE
-        logger.info(
-            f'Starting the gathering for {START_DATE.isoformat()} - {END_DATE.isoformat()}, a {delta = }'
-        )
-
-        await run_gather(event_loop, START_DATE, END_DATE)
-    else:
-        logger.info('Skipping the gather step. To gather provide --initial')
+    logger.info(f'Time taken - {(end - start) * 1000:.2f}ms')
 
 
 def get_loop_factory() -> Callable[..., asyncio.AbstractEventLoop]:

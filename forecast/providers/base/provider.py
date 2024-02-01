@@ -1,13 +1,14 @@
+import asyncio
+from asyncio import AbstractEventLoop
 from abc import ABC, abstractmethod
 from datetime import datetime
 from types import TracebackType
 
-import aiohttp
+from aiohttp import BaseConnector
 from pydantic_extra_types.coordinate import Coordinate
 
-from forecast.client_session_classes.api_client_session import ApiClientSession
+from forecast.client_session_classes.extended_client_session import ExtendedClientSession
 from forecast.logging import logger_provider
-from forecast.providers.enums import Granularity
 from forecast.providers.models import Weather
 from forecast.utils import pascal_case_to_snake_case
 
@@ -16,16 +17,19 @@ class Provider(ABC):
     def __init__(
         self,
         base_url: str,
-        connector: aiohttp.BaseConnector,
+        connector: BaseConnector,
         api_key: str | None = None,
+        *,
+        event_loop: AbstractEventLoop = None
     ) -> None:
         self.logger = logger_provider(__name__)
 
         self._base_url = base_url
         self._connector = connector
         self._api_key = api_key
+        self._event_loop = event_loop
 
-        self._session: ApiClientSession | None = None
+        self._session: ExtendedClientSession | None = None
 
         self.is_setup = False
         self.was_torn_down = False
@@ -45,7 +49,7 @@ class Provider(ABC):
             )
             return
 
-        self._session = ApiClientSession(self._base_url, self._api_key, self._connector)
+        self._session = ExtendedClientSession(self._base_url, self._connector)
         self.is_setup = True
 
     async def teardown(self) -> None:
@@ -69,7 +73,7 @@ class Provider(ABC):
         await self.teardown()
 
     @property
-    def session(self) -> ApiClientSession:
+    def session(self) -> ExtendedClientSession:
         if not self.is_setup or self._session is None:
             raise ValueError(
                 'The provider was never setup. Either manually call the setup method or use an async context manager'
@@ -80,13 +84,8 @@ class Provider(ABC):
     @abstractmethod
     async def get_historical_weather(
         self,
-        granularity: Granularity,
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
     ) -> list[Weather]:
         ...
-
-    @property
-    def api_key(self) -> str | None:
-        return self._api_key

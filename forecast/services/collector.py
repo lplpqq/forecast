@@ -4,18 +4,18 @@ scrap all info and put into database
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import islice
 from typing import Any
 
 import aiohttp
-from sqlalchemy import select
+from pydantic_extra_types.coordinate import Coordinate
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from tenacity import retry, retry_if_exception_type, stop_after_attempt
+from tenacity import after_log, retry, retry_if_exception_type, stop_after_attempt
 
 from forecast.db.models import City, WeatherJournal
 from forecast.providers.base import Provider
-from forecast.providers.enums import Granularity
 from forecast.providers.models.weather import Weather
 from forecast.services.base import ServiceWithDB
 
@@ -24,17 +24,17 @@ DEFAULT_WAIT_TIME_SECS = 10
 
 class CollectorService(ServiceWithDB):
     def __init__(
-        self,
-        connector: aiohttp.BaseConnector,
-        db_session_factory: async_sessionmaker[AsyncSession],
-        start_date: datetime,
-        end_date: datetime,
-        provider_instances: list[Provider],
-        event_loop: asyncio.AbstractEventLoop,
-        granularity: Granularity,
+            self,
+            connector: aiohttp.BaseConnector,
+            db_session_factory: async_sessionmaker[AsyncSession],
+            start_date: datetime,
+            end_date: datetime,
+            provider_instances: list[Provider],
+            event_loop: asyncio.AbstractEventLoop
     ) -> None:
         super().__init__(db_session_factory=db_session_factory)
 
+        self._cities: list[City] | None = None
         self._event_loop = event_loop
         self._connector = connector
 
@@ -42,17 +42,12 @@ class CollectorService(ServiceWithDB):
         self._end_date = end_date
 
         self._providers = provider_instances
-        self._granularity = granularity
 
     async def _map_providers(
-        self, to_apply: Callable[[Provider], Coroutine[Any, Any, Any]]
+            self, to_apply: Callable[[Provider], Coroutine[Any, Any, Any]]
     ):
-        await asyncio.gather(
-            *[
-                self._event_loop.create_task(to_apply(provider))
-                for provider in self._providers
-            ]
-        )
+        await asyncio.gather(*[self._event_loop.create_task(to_apply(provider))
+                               for provider in self._providers])
 
     async def setup(self) -> None:
         setup_providers_task = self._event_loop.create_task(
@@ -60,8 +55,9 @@ class CollectorService(ServiceWithDB):
         )
 
         async with self._db_session_factory() as session:
-            cities_query = select(City).order_by(City.population.desc())
-            self._cities = (await session.scalars(cities_query)).all()
+            self._cities = (await session.scalars(
+                select(City).order_by(City.population.desc())
+            )).all()
 
         await setup_providers_task
         await super().setup()
@@ -76,11 +72,15 @@ class CollectorService(ServiceWithDB):
         stop=stop_after_attempt(3),
     )
     async def _fetch(
-        self, provider: Provider, city: City, start_date: datetime, end_date: datetime
+            self,
+            provider: Provider,
+            city: City,
+            start_date: datetime,
+            end_date: datetime
     ) -> list[Weather]:
         try:
             data = await provider.get_historical_weather(
-                self._granularity, city, start_date, end_date
+                city, start_date, end_date
             )
         except aiohttp.ClientResponseError as exc:
             self.logger.info(
@@ -129,29 +129,29 @@ class CollectorService(ServiceWithDB):
             #         return
 
             present_data_query = select(WeatherJournal.date).where(
-                WeatherJournal.city_id == city.id,
-                WeatherJournal.date >= self._start_date,
-                WeatherJournal.date <= self._end_date,
+                 WeatherJournal.city_id == city.id,
+                 WeatherJournal.date >= self._start_date,
+                 WeatherJournal.date <= self._end_date,
             )
-
             present_data_dates = set((await session.scalars(present_data_query)).all())
 
             start_date, end_date = self._start_date, self._end_date
             if len(present_data_dates) > 0:
-                # TODO: Consider implementing splitting into multuple requests with different ranges if the gaps are small in size, even though spreadout throught a big period of time
-                present_range = (min(present_data_dates), max(present_data_dates))
-
-                start_date = min(present_range[0], self._start_date)
-                end_date = max(present_range[1], self._end_date)
+                # TODO: Consider implementing loging for splitting into multuple requests with
+                #  different ranges if the gaps are small in size, even though spreadout throught
+                #  a big period of time
+                start_date = min(min(present_data_dates), self._start_date)
+                end_date = max(max(present_data_dates), self._end_date)
 
             data = await self._fetch(provider, city, start_date, end_date)
 
-            for item in data:
-                if item.date in present_data_dates:
+            for weather in data:
+                if weather.date in present_data_dates:
                     continue
 
-                new_entry = WeatherJournal.from_weather_tuple(item, city.id)
-                session.add(new_entry)
+                session.add(
+                    WeatherJournal.from_weather_tuple(weather, city.id)
+                )
 
             await session.commit()
 
@@ -160,8 +160,10 @@ class CollectorService(ServiceWithDB):
         city_gather_tasks: list[asyncio.Task[None]] = []
 
         # FIXME: Remove the slice later
-        for city in islice(self._cities, 5):
-            new_task = self._event_loop.create_task(self._collect_city(city, provider))
+        for city in islice(self._cities, 100):
+            new_task = self._event_loop.create_task(
+                self._collect_city(city, provider)
+            )
 
             city_gather_tasks.append(new_task)
 
