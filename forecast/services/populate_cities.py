@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from forecast.db.models import City
-from forecast.services.base import MininalServiceWithEverything
+from forecast.services.base import Service
 from forecast.services.models import CityTuple
 from lib.fs_utils import validate_path
 
@@ -21,7 +21,7 @@ CITIES_CSV_IN_ARCHIVE_NAME = 'worldcities.csv'
 BASE_URL = 'https://simplemaps.com/static/data/world-cities/basic'
 
 
-class PopulateCitiesService(MininalServiceWithEverything):
+class PopulateCitiesService(Service):
     def __init__(
         self,
         connector: aiohttp.BaseConnector,
@@ -65,8 +65,8 @@ class PopulateCitiesService(MininalServiceWithEverything):
         return df
 
     async def setup(self) -> None:
-        self._cities_df = await self.fetch_cities_list()
         await super().setup()
+        self._cities_df = await self.fetch_cities_list()
 
     async def populate_cities(self) -> None:
         async with self._db_session_factory() as session:
