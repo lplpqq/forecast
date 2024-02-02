@@ -4,6 +4,7 @@ import typing
 from typing import Self
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.db.models.base import Base
 
@@ -17,7 +18,7 @@ class City(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    name: Mapped[str] = mapped_column()
+    name: Mapped[str] = mapped_column(index=True)
     latitude: Mapped[float] = mapped_column()
     longitude: Mapped[float] = mapped_column()
     country_name: Mapped[str] = mapped_column()
@@ -37,3 +38,10 @@ class City(Base):
         )
 
         return new_city
+
+    @property
+    def coordinate(self):
+        return Coordinate(
+            latitude=self.latitude,
+            longitude=self.longitude
+        )

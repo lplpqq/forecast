@@ -29,7 +29,7 @@ class BaseService(ABC):
             return
 
         self.is_setup = True
-        self.logger.info(f'Finised setting up {self.name} service')
+        self.logger.info(f'Finished setting up {self.name} service')
 
     @abstractmethod
     async def _run(self) -> None:
@@ -38,7 +38,8 @@ class BaseService(ABC):
     async def run(self) -> None:
         if not self.is_setup or self.was_torn_down:
             self.logger.info(
-                f'{self.name} service was either already been turn down or has not yet been setup. You may not run it'
+                f'{self.name} service was either already been turn down or has not yet been setup. '
+                f'You may not run it'
             )
 
         self.logger.info(f'Running {self.name} service')

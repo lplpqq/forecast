@@ -26,6 +26,7 @@ pyright = "^1.1.349"
 pyarrow = "^15.0.0"
 tenacity = "^8.2.3"
 uvicorn = {extras = ["standard"], version = "^0.27.0.post1"}
+tqdm = "^4.66.1"
 
 [tool.poetry.group.dev.dependencies]
 isort = "*"

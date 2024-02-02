@@ -19,13 +19,14 @@ CITIES_CACHE_FILE: Final[Path] = CACHE_FOLDER.joinpath('./cities/cities.csv')
 CITIES_CSV_IN_ARCHIVE_NAME = 'worldcities.csv'
 
 BASE_URL = 'https://simplemaps.com/static/data/world-cities/basic'
+COLUMNS = ('city', 'lat', 'lng', 'country', 'population')
 
 
 class PopulateCitiesService(MininalServiceWithEverything):
     def __init__(
-        self,
-        connector: aiohttp.BaseConnector,
-        session_factory: async_sessionmaker[AsyncSession],
+            self,
+            connector: aiohttp.BaseConnector,
+            session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         super().__init__(BASE_URL, connector, session_factory)
         self._cities_df: pd.DataFrame | None = None
@@ -39,40 +40,44 @@ class PopulateCitiesService(MininalServiceWithEverything):
             autocreate_is_recursive=True,
         )
 
-        if CITIES_CACHE_FILE.exists():
+        try:
             df = pd.read_csv(
                 CITIES_CACHE_FILE,
-                usecols=['city', 'lat', 'lng', 'country', 'population'],
+                usecols=COLUMNS
             )
             return df
+        except FileNotFoundError:
+            pass
 
         archive = await self._aiohttp_session.get_raw(
             '/simplemaps_worldcities_basicv1.76.zip'
         )
 
         with zipfile.ZipFile(io.BytesIO(archive)) as archive_handle:
-            if CITIES_CSV_IN_ARCHIVE_NAME not in archive_handle.namelist():
+            try:
+                data = archive_handle.read(CITIES_CSV_IN_ARCHIVE_NAME)
+            except KeyError:
                 raise ValueError(
                     f'The wanted file "{CITIES_CSV_IN_ARCHIVE_NAME}" is not found in the archive'
                 )
 
-            data = archive_handle.read(CITIES_CSV_IN_ARCHIVE_NAME)
-
-        df = pd.read_csv(io.BytesIO(data))
-        df.where(df['population'] > 1000).dropna(axis=0, how='any', inplace=True)
+        df = pd.read_csv(io.BytesIO(data), usecols=COLUMNS)
+        df['population'] = df['population'].fillna(value=0).astype(int)
+        # fill None values with 0 in order to successfully cast population into integer
+        df = df.where(df['population'] >= 150_000).dropna(axis=0)
         df.to_csv(CITIES_CACHE_FILE, index=False)
 
         return df
 
     async def setup(self) -> None:
-        self._cities_df = await self.fetch_cities_list()
         await super().setup()
+        self._cities_df = await self.fetch_cities_list()
 
     async def populate_cities(self) -> None:
         async with self._db_session_factory() as session:
-            present_locations = set(
-                (await session.execute(select(City.latitude, City.longitude))).all()
-            )
+            present_locations = set((await session.execute(
+                select(City.latitude, City.longitude))
+            ).all())
 
             for row in self._cities_df.itertuples(index=False):
                 city_tuple = CityTuple._make(row)

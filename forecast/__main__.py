@@ -1,10 +1,8 @@
 import asyncio
 import sys
 import time
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from collections.abc import Callable
 from datetime import datetime
-from typing import Protocol
 
 import aiohttp
 
@@ -17,30 +15,6 @@ from forecast.providers.meteostat import Meteostat
 from forecast.services import CollectorService, PopulateCitiesService
 
 logger = logger_provider(__name__)
-
-
-class Orchestratable(Protocol):
-    async def setup(self) -> None:
-        ...
-
-    async def teardown(self) -> None:
-        ...
-
-
-@asynccontextmanager
-async def orchestrate_anything(
-    *orchestratables: Orchestratable,
-) -> AsyncIterator[None]:
-    await asyncio.gather(
-        *[orchestratable.setup() for orchestratable in orchestratables]
-    )
-
-    try:
-        yield
-    finally:
-        await asyncio.gather(
-            *[orchestratable.teardown() for orchestratable in orchestratables]
-        )
 
 
 async def run_gather(
@@ -56,10 +30,8 @@ async def run_gather(
         # * Providers init
         # openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         meteostat = Meteostat(connector, event_loop=event_loop)
-        world_weather = WorldWeatherOnline(
-            connector, config.data_sources.world_weather_online.api_key
-        )
-        visual_crossing = VisualCrossing(connector, event_loop=event_loop)
+        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
+        # visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         # * Services init
         populate_cities_service = PopulateCitiesService(connector, session_factory)
@@ -69,16 +41,17 @@ async def run_gather(
             session_factory,
             start_date,
             end_date,
-            # [openmeteo, meteostat, world_weather, visual_crossing],
-            [meteostat, world_weather, visual_crossing],
+            [meteostat], #world_weather, visual_crossing],
             event_loop,
         )
 
-        services = [populate_cities_service, collector_service]
+        await populate_cities_service.setup()
+        await populate_cities_service.run()
+        await populate_cities_service.teardown()
 
-        async with orchestrate_anything(*services):
-            await populate_cities_service.run()
-            await collector_service.run()
+        await collector_service.setup()
+        await collector_service.run()
+        await collector_service.teardown()
 
     end = time.perf_counter()
     logger.info(f'Time taken - {end - start}')

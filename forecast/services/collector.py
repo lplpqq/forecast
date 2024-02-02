@@ -5,10 +5,11 @@ scrap all info and put into database
 import asyncio
 from collections.abc import Callable, Coroutine
 from datetime import datetime
-from itertools import islice
 from typing import Any
 
+from tqdm import tqdm
 import aiohttp
+from pydantic_extra_types.coordinate import Coordinate
 from sqlalchemy import exc, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tenacity import (
@@ -64,9 +65,12 @@ class CollectorService(ServiceWithDB):
             self._map_providers(lambda provider: provider.setup())
         )
 
+        self._present_date_data: dict[
+            tuple[str, str], tuple[datetime, datetime]
+        ] = {}
         async with self._db_session_factory() as session:
-            self._cities = (
-                await session.scalars(select(City).order_by(City.population.desc()))
+            self._cities = (await session.scalars(
+                select(City).order_by(City.population.desc()))
             ).all()
 
         await setup_providers_task
@@ -82,10 +86,14 @@ class CollectorService(ServiceWithDB):
         stop=stop_after_attempt(3),
     )
     async def _fetch(
-        self, provider: Provider, city: City, start_date: datetime, end_date: datetime
+        self,
+        provider: Provider,
+        coordinate: Coordinate,
+        start_date: datetime,
+        end_date: datetime
     ) -> list[Weather] | None:
         try:
-            data = await provider.get_historical_weather(city, start_date, end_date)
+            data = await provider.get_historical_weather(coordinate, start_date, end_date)
         except aiohttp.ClientResponseError as exc:
             self.logger.info(
                 f'Provider {provider.name} encountered an http error: {exc.status}'
@@ -117,6 +125,7 @@ class CollectorService(ServiceWithDB):
             async with self._db_session_factory() as session:
                 # TODO: Don't perform this query on every city. Try to cache where possible or prefect all of the data in advance. This is REALLY slow and we run out of connections the sqlalchemy connection pool. The semaphore is setup for that exact reason.
                 present_data_query = select(WeatherJournal.date).where(
+                    WeatherJournal.data_source == provider.name,
                     WeatherJournal.city_id == city.id,
                     WeatherJournal.date >= self._start_date,
                     WeatherJournal.date <= self._end_date,
@@ -131,7 +140,9 @@ class CollectorService(ServiceWithDB):
                     end_date = max(max(present_data_dates), self._end_date)
 
                 try:
-                    data = await self._fetch(provider, city, start_date, end_date)
+                    data = await self._fetch(
+                        provider, city.coordinate, start_date, end_date
+                    )
                 except RetryError:
                     self.logger.info(
                         f'We did our best to wait for the timeout on {provider.name = } to go away. But it never id so. We are skipping the provider for {city.name = }'
@@ -148,25 +159,29 @@ class CollectorService(ServiceWithDB):
                     if weather.date in present_data_dates:
                         continue
 
-                    session.add(WeatherJournal.from_weather_tuple(weather, city.id))
+                    session.add(
+                        WeatherJournal.from_weather_tuple(weather, city.id)
+                    )
 
                 try:
                     await session.commit()
                 except exc.IntegrityError as error:
                     self.logger.error(
-                        f'There seems to be some data missing when fetching for {city.name = } from {provider.name = }. Please investigate further, we will be skipping getting the city data with this provider for now. Here is the error:'
+                        f'There seems to be some data missing when fetching for {city.name = } from {provider.name = }.'
+                        f' Please investigate further, we will be skipping getting '
+                        f'the city data with this provider for now. '
+                        f'Here is the error:', error
                     )
-                    self.logger.error(error)
-
-                    return
 
     async def _collect_provider(self, provider: Provider) -> None:
         # TODO: More logs as to what the code is doing and is going to do so that the user is aware of what is being fetched.
         city_gather_tasks: list[asyncio.Task[None]] = []
 
-        # FIXME: Remove the slice later
-        for city in islice(self._cities, 5):
-            new_task = self._event_loop.create_task(self._collect_city(city, provider))
+        self.logger.info(f'Starting to collect {len(self._cities)} cities...')
+        for city in self._cities:
+            new_task = self._event_loop.create_task(
+                self._collect_city(city, provider)
+            )
 
             city_gather_tasks.append(new_task)
 

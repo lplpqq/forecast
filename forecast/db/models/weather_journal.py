@@ -16,18 +16,23 @@ if typing.TYPE_CHECKING:
 
 class WeatherJournal(Base):
     __tablename__ = 'weather_journal'
+    # __table_args__ = (
+    #     Index('idx_weather_journal_date', 'date'),
+    #     Index('idx_weather_journal_temperature', 'temperature'),
+    #     Index('idx_weather_journal_precipitation', 'precipitation'),
+    # )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
     data_source: Mapped[str] = mapped_column()
     date: Mapped[datetime] = mapped_column(DateTime, index=True)
-    temperature: Mapped[float] = mapped_column(index=True)
-    pressure: Mapped[float] = mapped_column()
-    wind_speed: Mapped[float] = mapped_column()
-    wind_direction: Mapped[float] = mapped_column()
-    humidity: Mapped[float] = mapped_column()
+    temperature: Mapped[float] = mapped_column(nullable=True, index=True)
+    pressure: Mapped[float] = mapped_column(nullable=True)
+    wind_speed: Mapped[float] = mapped_column(nullable=True)
+    wind_direction: Mapped[float] = mapped_column(nullable=True)
+    humidity: Mapped[float] = mapped_column(nullable=True)
     clouds: Mapped[float] = mapped_column(nullable=True)
-    precipitation: Mapped[float] = mapped_column(index=True)
+    precipitation: Mapped[float] = mapped_column(nullable=True, index=True)
     snow: Mapped[float] = mapped_column(nullable=True)
 
     city_id: Mapped[int] = mapped_column(ForeignKey('city.id'))

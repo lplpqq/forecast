@@ -8,7 +8,7 @@ import io
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Final, NewType, TypeAlias, cast
+from typing import Any, Final, NewType, TypeAlias
 
 import aiohttp
 import numpy as np
@@ -62,7 +62,6 @@ DEFAULT_CSV_NAMES = (
     'coco',
 )
 
-
 BASE_URL = 'https://bulk.meteostat.net/v2'
 
 
@@ -72,7 +71,6 @@ class Meteostat(Provider):
 
         self._stations_cache_file = STATIONS_CACHE_FOLDER.joinpath('./list-lite.json')
         self._stations_df: pd.DataFrame | None = None
-        self._stations_coordinates: FloatsArray | None = None
 
         validate_path(
             self._stations_cache_file,
@@ -132,37 +130,36 @@ class Meteostat(Provider):
             ]
         )
 
-        self._stations_coordinates = cast(
-            FloatsArray, self._stations_df[['latitude', 'longitude']].values
-        )
-
     def _find_nearest_station(self, point: Coordinate) -> StationId:
-        if self._stations_df is None or self._stations_coordinates is None:
+        if self._stations_df is None:
             # fixme if you just call self.setup() from here there wont be any purpose of making setup method public
             raise ValueError('You need to call .setup() first to prime the data.')
 
         start = time.perf_counter()
         closest = distance.cdist(
-            np.array([(point.latitude, point.longitude)]), self._stations_coordinates
+            np.array([(point.latitude, point.longitude)]),
+            self._stations_df[['latitude', 'longitude']].values
         )
         end = time.perf_counter()
 
         self.logger.debug(
-            f'Took: {end - start} to compute the closest point with {self._stations_coordinates.shape[0]} points'
+            f'Took: {end - start} to compute the closest point with {len(self._stations_df.index)} points'
         )
 
         index = closest.argmin()
         return StationId(self._stations_df.iloc[index]['id'])
 
     async def _fetch_data_for_year(
-        self, station_id: StationId, year: int
+            self, station_id: StationId, year: int
     ) -> pd.DataFrame:
         compressed_data = await self.session.get_raw(
             f'/hourly/{year}/{station_id}.csv.gz'
         )
 
         df = pd.read_csv(
-            io.BytesIO(compressed_data), names=DEFAULT_CSV_NAMES, compression='gzip'
+            io.BytesIO(compressed_data),
+            names=DEFAULT_CSV_NAMES,
+            compression='gzip'
         )
         df['date'] = pd.to_datetime(
             df['date'] + ' ' + df['hour'].astype(str).str.zfill(2), format='%Y-%m-%d %H'
@@ -171,11 +168,11 @@ class Meteostat(Provider):
         return df.drop(['hour'], axis=1)
 
     async def get_for_station(
-        self,
-        station_id: StationId,
-        start_date: datetime,
-        end_date: datetime,
-    ) -> pd.DataFrame:
+            self,
+            station_id: StationId,
+            start_date: datetime,
+            end_date: datetime,
+    ) -> pd.DataFrame | None:
         fetch_tasks = []
         start = time.perf_counter()
         for year in range(start_date.year, end_date.year + 1):
@@ -190,7 +187,12 @@ class Meteostat(Provider):
             f'Took to gather and parse {len(results)} CSV file(s): {end - start}'
         )
 
-        concatenated_df = pd.concat(results)
+        filtered_results = [df for df in results if not df.empty]
+        if len(filtered_results) == 0:
+            self.logger.warning(f'No results found for station id: {station_id}')
+            return None
+
+        concatenated_df = pd.concat(filtered_results)
         # * Reordering the table columns
         concatenated_df['clouds'] = None
         concatenated_df['data_source'] = self.name
@@ -210,17 +212,15 @@ class Meteostat(Provider):
             ]
         ]
 
-        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(
-            2
-        )  # converts km/h to m/s
+        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(2)  # converts km/h to m/s
 
         return concatenated_df
 
     async def get_historical_weather(
-        self,
-        coordinate: Coordinate,
-        start_date: datetime,
-        end_date: datetime,
+            self,
+            coordinate: Coordinate,
+            start_date: datetime,
+            end_date: datetime,
     ) -> Any:
         nearest_station = self._find_nearest_station(coordinate)
 
@@ -229,8 +229,11 @@ class Meteostat(Provider):
         )
 
         df = await self.get_for_station(nearest_station, start_date, end_date)
+        if df is None:
+            return []
 
         mask = (df['date'] >= start_date) & (df['date'] <= end_date)
-        df = df.loc[mask]
+        df: pd.DataFrame = df.loc[mask]
+        df = df.replace([np.nan], [None])
 
         return [Weather._make(row) for row in df.itertuples(index=False)]
