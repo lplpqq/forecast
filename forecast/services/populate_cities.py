@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from forecast.db.models import City
-from forecast.services.base import MininalServiceWithEverything
+from forecast.services.base import Service
 from forecast.services.models import CityTuple
 from lib.fs_utils import validate_path
 
@@ -23,7 +23,7 @@ COLUMNS = ('city', 'lat', 'lng', 'country', 'population')
 MIN_POPULATION = 150_000
 
 
-class PopulateCitiesService(MininalServiceWithEverything):
+class PopulateCitiesService(Service):
     def __init__(
             self,
             connector: aiohttp.BaseConnector,
