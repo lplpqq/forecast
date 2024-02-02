@@ -27,6 +27,13 @@ class Service(Generic[T], BaseService, ABC):
 
         super().__init__()
 
+    async def __aenter__(self):
+        await self.setup()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.teardown()
+
     async def _setup_aiohttp_session(self) -> None:
         self._aiohttp_session = ExtendedClientSession(
             connector=self._connector, **self._client_session_kwargs
@@ -41,4 +48,5 @@ class Service(Generic[T], BaseService, ABC):
     async def teardown(self) -> None:
         await super().teardown()
 
-        await self._aiohttp_session.close()
+        if self._aiohttp_session is not None:
+            await self._aiohttp_session.close()

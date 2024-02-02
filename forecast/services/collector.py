@@ -169,10 +169,7 @@ class CollectorService(Service):
 
     async def _collect_provider(self, provider: Provider) -> None:
         # TODO: More logs as to what the code is doing and is going to do so that the user is aware of what is being fetched.
-        chunked_cities = chunks(self._cities, GATHER_CHUNK_SIZE)
-
-        self.logger.info(f'Starting to collect {len(self._cities)} cities...')
-        for chunk in chunked_cities:
+        for chunk in chunks(self._cities, GATHER_CHUNK_SIZE):
             city_gather_tasks: list[asyncio.Task[None]] = []
 
             for city in chunk:
@@ -185,4 +182,5 @@ class CollectorService(Service):
             await asyncio.gather(*city_gather_tasks)
 
     async def _run(self) -> None:
+        self.logger.info(f'Starting to collect {len(self._cities)} cities...')
         await self._map_providers(lambda provider: self._collect_provider(provider))

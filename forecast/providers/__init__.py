@@ -4,3 +4,4 @@ from forecast.providers.weather_bit import WeatherBit as WeatherBit
 from forecast.providers.world_weather_online import (
     WorldWeatherOnline as WorldWeatherOnline,
 )
+from forecast.providers.meteostat import Meteostat as Meteostat

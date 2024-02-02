@@ -10,7 +10,7 @@ from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
 from forecast.parse_args import create_parser, parse_args
-from forecast.providers.meteostat import Meteostat
+from forecast.providers import OpenMeteo, WorldWeatherOnline, Meteostat, VisualCrossing
 from forecast.services import CollectorService, PopulateCitiesService
 
 logger = logger_provider(__name__)
@@ -26,39 +26,31 @@ async def run_gather(
     session_factory = await connect(engine)
 
     async with aiohttp.TCPConnector() as connector:
-        # * Providers init
-        # openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
-        meteostat = Meteostat(connector, event_loop=event_loop)
-        # world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
-        # visual_crossing = VisualCrossing(connector, event_loop=event_loop)
-
-        # * Services init
-        populate_cities_service = PopulateCitiesService(
+        async with PopulateCitiesService(
             session_factory, connector=connector
-        )
+        ) as populate_cities_service:
+            await populate_cities_service.run()
 
-        collector_service = CollectorService(
+        #open_meteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
+        meteostat = Meteostat(connector, event_loop=event_loop)
+        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
+        #visual_crossing = VisualCrossing(connector, event_loop=event_loop)
+
+        async with CollectorService(
             session_factory,
             start_date,
             end_date,
-            [meteostat],  # world_weather, visual_crossing],
+            [meteostat, world_weather],
             event_loop,
-        )
-
-        await populate_cities_service.setup()
-        await populate_cities_service.run()
-        await populate_cities_service.teardown()
-
-        await collector_service.setup()
-        await collector_service.run()
-        await collector_service.teardown()
+        ) as collector_service:
+            await collector_service.run()
 
     end = time.perf_counter()
     logger.info(f'Time taken - {end - start}')
 
 
-START_DATE = datetime(2020, 1, 1)
-END_DATE = datetime(2021, 1, 1)
+START_DATE = datetime(2023, 1, 31)
+END_DATE = datetime(2024, 1, 31)
 
 
 async def main(event_loop: asyncio.AbstractEventLoop) -> None:

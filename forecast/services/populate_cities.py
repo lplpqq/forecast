@@ -20,7 +20,7 @@ CITIES_CSV_IN_ARCHIVE_NAME = 'worldcities.csv'
 
 BASE_URL = 'https://simplemaps.com/static/data/world-cities/basic'
 COLUMNS = ('city', 'lat', 'lng', 'country', 'population')
-MIN_POPULATION = 150_000
+MIN_POPULATION = 1_000_000
 
 
 class PopulateCitiesService(Service):
@@ -45,7 +45,9 @@ class PopulateCitiesService(Service):
 
         try:
             df = pd.read_csv(CITIES_CACHE_FILE, usecols=COLUMNS)
-            return df.where(df['population'] >= MIN_POPULATION)
+            return df[
+                (df['population'] >= MIN_POPULATION) & ~(df['country'].isin(['China', 'India']))
+            ]
         except FileNotFoundError:
             pass
 
@@ -64,10 +66,12 @@ class PopulateCitiesService(Service):
         df = pd.read_csv(io.BytesIO(data), usecols=COLUMNS)
         df['population'] = df['population'].fillna(value=0).astype(int)
         # fill None values with 0 in order to successfully cast population into integer
-        df = df.where(df['population'] >= 150_000).dropna(axis=0)
+        df.dropna(axis=0)
         df.to_csv(CITIES_CACHE_FILE, index=False)
 
-        return df
+        return df[
+            (df['population'] >= MIN_POPULATION) & ~(df['country'].isin(['China', 'India']))
+        ]
 
     async def setup(self) -> None:
         await super().setup()
