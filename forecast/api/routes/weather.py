@@ -1,12 +1,12 @@
 from datetime import datetime
 
-import sqlalchemy
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 
 from forecast.api.dependencies import InjectedDBSesssion
 from forecast.api.dependencies.closest_city_provider import ClosestCityProvider
 from forecast.api.models.weather import WeatherData, WeatherResponse
-from forecast.db.models import City
+from forecast.db.models import City, WeatherJournal
 from forecast.logging import logger_provider
 
 router = APIRouter(prefix='/weather')
@@ -19,33 +19,6 @@ logger = logger_provider(__name__)
 closest_city_provider = ClosestCityProvider()
 
 
-HISTORY_REQUEST = sqlalchemy.text(
-    f"""
-select
-    wj.date,
-    count(wj.id) as merge_rows_count,
-    avg(wj.temperature) as temperature,
-    avg(wj.pressure) as pressure,
-    avg(wj.wind_speed) as wind_speed,
-    avg(wj.wind_direction) as wind_direction,
-    avg(wj.humidity) as humidity,
-    avg(wj.precipitation) as precipitation,
-    avg(wj.snow) as snow
-from weather_journal wj
-join city c on wj.city_id = c.id
-where
-    wj.precipitation <> 'NaN'::numeric and
-    wj.date >= :from_date and
-    wj.date <= :to_date and
-    c.latitude = :city_latitude and
-    c.longitude = :city_longitude
-group by wj.date
-order by wj.date
-limit {PAGE_SIZE + 1};
-"""
-)
-
-
 @router.get('/')
 async def get_weather(
     session: InjectedDBSesssion,
@@ -56,22 +29,38 @@ async def get_weather(
 ) -> WeatherResponse:
     if from_date > to_date:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail='from should be eariler in time to'
+            status.HTTP_400_BAD_REQUEST, detail='from should be earlier in time to'
         )
 
-    logger.info(f'Fetching feather data for: {city.name}')
+    from_date = from_date.replace(tzinfo=None)
+    to_date = to_date.replace(tzinfo=None)
 
-    history = (
-        await session.execute(
-            HISTORY_REQUEST,
-            {
-                'from_date': cursor or from_date,
-                'to_date': to_date,
-                'city_latitude': city.latitude,
-                'city_longitude': city.longitude,
-            },
+    logger.info(f'Fetching further data for: {city.name}')
+
+    history_query = (
+        select(
+            WeatherJournal.date,
+            func.avg(WeatherJournal.temperature).label('temperature'),
+            func.avg(WeatherJournal.pressure).label('pressure'),
+            func.avg(WeatherJournal.wind_speed).label('wind_speed'),
+            func.avg(WeatherJournal.wind_direction).label('wind_direction'),
+            func.avg(WeatherJournal.humidity).label('humidity'),
+            func.avg(WeatherJournal.precipitation).label('precipitation'),
+            func.avg(WeatherJournal.snow).label('snow'),
         )
-    ).all()
+        .where(
+            WeatherJournal.date >= (cursor or from_date),
+            WeatherJournal.date <= to_date,
+            WeatherJournal.city_id == city.id,
+            WeatherJournal.precipitation.isnot(None),
+            WeatherJournal.snow.isnot(None),
+        )
+        .group_by(WeatherJournal.date)
+        .order_by(WeatherJournal.date)
+        .limit(PAGE_SIZE + 1)
+    )
+
+    history = (await session.execute(history_query)).all()
     data = [WeatherData.model_validate(model._mapping) for model in history]
 
     next_date = None

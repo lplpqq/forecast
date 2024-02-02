@@ -46,7 +46,8 @@ class PopulateCitiesService(Service):
         try:
             df = pd.read_csv(CITIES_CACHE_FILE, usecols=COLUMNS)
             return df[
-                (df['population'] >= MIN_POPULATION) & ~(df['country'].isin(['China', 'India']))
+                (df['population'] >= MIN_POPULATION)
+                & ~(df['country'].isin(['China', 'India']))
             ]
         except FileNotFoundError:
             pass
@@ -70,7 +71,8 @@ class PopulateCitiesService(Service):
         df.to_csv(CITIES_CACHE_FILE, index=False)
 
         return df[
-            (df['population'] >= MIN_POPULATION) & ~(df['country'].isin(['China', 'India']))
+            (df['population'] >= MIN_POPULATION)
+            & ~(df['country'].isin(['China', 'India']))
         ]
 
     async def setup(self) -> None:

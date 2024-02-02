@@ -4,6 +4,7 @@ import numpy as np
 import numpy.typing as npt
 from fastapi import HTTPException, Query, status
 from scipy.spatial.distance import cdist
+from sqlalchemy import select
 
 from forecast.api.dependencies import InjectedDBSesssion
 from forecast.api.dependencies.cities_provider import InjectedCities
@@ -27,9 +28,9 @@ class ClosestCityProvider:
         cities: InjectedCities,
         latitude: float | None = Query(alias='lat', default=None, ge=-90, le=90),
         longitude: float | None = Query(alias='long', default=None, ge=-180, le=180),
-        city: str | None = Query(default=None),
+        city_name: str | None = Query(default=None, alias='city'),
     ) -> City:
-        if latitude is None and longitude is None and city is None:
+        if latitude is None and longitude is None and city_name is None:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail='You have to either provider the lat and long query params or the city name as city, neither were provided',
@@ -43,7 +44,7 @@ class ClosestCityProvider:
                 detail='You have to provider both the latitude and longidute as lat and long query params',
             )
 
-        if city is not None and longitude is not None and latitude is not None:
+        if city_name is not None and longitude is not None and latitude is not None:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Please either provide the long and lat or the city, can't be both",
@@ -61,7 +62,12 @@ class ClosestCityProvider:
 
             city = cities[closest.argmin()]
         else:
-            # FIXME: FIXME
-            raise NotImplementedError()
+            city = await session.scalar(select(City).where(City.name == city_name))
+            if city is None:
+                raise HTTPException(
+                    status.HTTP_404_NOT_FOUND, detail=f'City {city_name} not found'
+                )
+
+            return city
 
         return city

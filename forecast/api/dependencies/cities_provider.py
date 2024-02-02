@@ -14,7 +14,7 @@ class CitiesProvider:
     async def fetch_cities_and_cache(self, session: AsyncSession) -> None:
         self._cities = list((await session.scalars(select(City))).all())
 
-    async def __call__(self, *args, **kwargs):
+    async def __call__(self):
         if self._cities is None:
             await self.fetch_cities_and_cache()
 

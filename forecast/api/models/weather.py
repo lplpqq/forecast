@@ -10,8 +10,8 @@ class WeatherData(BaseModel):
     wind_speed: float
     wind_direction: float
     humidity: float
-    precipitation: float
-    snow: float
+    precipitation: float | None
+    snow: float | None
 
     class Config:
         from_attributes = True

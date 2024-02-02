@@ -10,7 +10,7 @@ from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
 from forecast.parse_args import create_parser, parse_args
-from forecast.providers import OpenMeteo, WorldWeatherOnline, Meteostat, VisualCrossing
+from forecast.providers import Meteostat, WorldWeatherOnline
 from forecast.services import CollectorService, PopulateCitiesService
 
 logger = logger_provider(__name__)
@@ -31,10 +31,12 @@ async def run_gather(
         ) as populate_cities_service:
             await populate_cities_service.run()
 
-        #open_meteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
+        # open_meteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         meteostat = Meteostat(connector, event_loop=event_loop)
-        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
-        #visual_crossing = VisualCrossing(connector, event_loop=event_loop)
+        world_weather = WorldWeatherOnline(
+            connector, config.data_sources.world_weather_online.api_key
+        )
+        # visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         async with CollectorService(
             session_factory,
