@@ -15,7 +15,7 @@ router = APIRouter(prefix='/weather')
 PAGE_SIZE = 500
 
 
-logger = logger_provider(__name__)
+logger = logger_provider(name)
 closest_city_provider = ClosestCityProvider()
 
 

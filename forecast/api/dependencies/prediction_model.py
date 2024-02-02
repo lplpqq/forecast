@@ -1,10 +1,9 @@
-import asyncio
 from datetime import datetime, timedelta
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from sqlalchemy import select
+from sqlalchemy import select, func
 from tensorflow.keras.layers import LSTM, Dense
 from tensorflow.keras.models import Sequential
 
@@ -19,11 +18,36 @@ class WeatherPredictor:
         self.scaler_y = None
         self.trained = False
 
-    async def train(self):
+    async def train(self, session: InjectedDBSesssion):
         timeframe = datetime.now() - timedelta(days=4)
+        history_query = (
+            select(
+                WeatherJournal.date,
+                func.avg(WeatherJournal.temperature).label('temperature'),
+                func.avg(WeatherJournal.pressure).label('pressure'),
+                func.avg(WeatherJournal.wind_speed).label('wind_speed'),
+                func.avg(WeatherJournal.wind_direction).label('wind_direction'),
+                func.avg(WeatherJournal.humidity).label('humidity'),
+                func.avg(WeatherJournal.precipitation).label('precipitation'),
+                func.avg(WeatherJournal.snow).label('snow'),
+            )
+            .where(
+                WeatherJournal.date >= timeframe,
+                WeatherJournal.precipitation.isnot(None),
+                WeatherJournal.snow.isnot(None),
+            )
+            .group_by(WeatherJournal.date)
+            .order_by(WeatherJournal.date)
+        )
+        result = (await session.execute(history_query)).all()
 
-        df = pd.read_csv('data.csv')
-        df['date'] = pd.to_datetime(df['date'])
+        df = pd.DataFrame({
+            "date": weather.date,
+            "temperature": weather.temperature,
+            "pressure": weather.pressure,
+            "wind_speed": weather.wind_speed,
+            "wind_direction": weather.wind_direction
+        } for weather in result)
 
         df['year'] = df['date'].dt.year
         df['month'] = df['date'].dt.month
@@ -31,7 +55,7 @@ class WeatherPredictor:
         df['hour'] = df['date'].dt.hour
 
         x = df[['year', 'month', 'day', 'hour']].values
-        y = df[['temp', 'pres', 'wspd', 'wdir']].values
+        y = df[['temperature', 'pressure', 'wind_speed', 'wind_direction']].values
 
         self.scaler_x = MinMaxScaler(feature_range=(0, 1))
         self.scaler_y = MinMaxScaler(feature_range=(0, 1))
@@ -61,21 +85,3 @@ class WeatherPredictor:
         predictions_scaled = self.model.predict(new_date_reshaped)
         predictions = self.scaler_y.inverse_transform(predictions_scaled)
         return predictions
-
-    async def __call__(self, date: datetime):
-        if self.trained:
-            return self.predict(date)
-        else:
-            await self.train()
-            self.trained = True
-            return await self.__call__(date)
-
-
-async def main():
-    predictor = WeatherPredictor()
-    print(
-        await predictor(datetime(2020, 2, 12, 0))
-    )
-
-
-asyncio.run(main())
