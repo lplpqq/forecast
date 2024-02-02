@@ -1,5 +1,6 @@
-import { Theme } from '@radix-ui/themes';
-import '@radix-ui/themes/styles.css';
+import Header from '@/components/Header';
+import { ColorSchemeScript, MantineProvider } from '@mantine/core';
+import '@mantine/core/styles.css';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -18,14 +19,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <ColorSchemeScript />
+      </head>
       <body className={inter.className}>
-        <Theme
-          appearance="light"
-          accentColor="amber"
-          panelBackground="solid"
-        >
+        <MantineProvider>
+          <Header />
           {children}
-        </Theme>
+        </MantineProvider>
       </body>
     </html>
   );
