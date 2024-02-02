@@ -138,7 +138,7 @@ class Meteostat(Provider):
         start = time.perf_counter()
         closest = distance.cdist(
             np.array([(point.latitude, point.longitude)]),
-            self._stations_df[['latitude', 'longitude']].values
+            self._stations_df[['latitude', 'longitude']].values,
         )
         end = time.perf_counter()
 
@@ -150,16 +150,14 @@ class Meteostat(Provider):
         return StationId(self._stations_df.iloc[index]['id'])
 
     async def _fetch_data_for_year(
-            self, station_id: StationId, year: int
+        self, station_id: StationId, year: int
     ) -> pd.DataFrame:
         compressed_data = await self.session.get_raw(
             f'/hourly/{year}/{station_id}.csv.gz'
         )
 
         df = pd.read_csv(
-            io.BytesIO(compressed_data),
-            names=DEFAULT_CSV_NAMES,
-            compression='gzip'
+            io.BytesIO(compressed_data), names=DEFAULT_CSV_NAMES, compression='gzip'
         )
         df['date'] = pd.to_datetime(
             df['date'] + ' ' + df['hour'].astype(str).str.zfill(2), format='%Y-%m-%d %H'
@@ -168,10 +166,10 @@ class Meteostat(Provider):
         return df.drop(['hour'], axis=1)
 
     async def get_for_station(
-            self,
-            station_id: StationId,
-            start_date: datetime,
-            end_date: datetime,
+        self,
+        station_id: StationId,
+        start_date: datetime,
+        end_date: datetime,
     ) -> pd.DataFrame | None:
         fetch_tasks = []
         start = time.perf_counter()
@@ -212,15 +210,17 @@ class Meteostat(Provider):
             ]
         ]
 
-        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(2)  # converts km/h to m/s
+        concatenated_df['wspd'] = (concatenated_df['wspd'] / 3.6).round(
+            2
+        )  # converts km/h to m/s
 
         return concatenated_df
 
     async def get_historical_weather(
-            self,
-            coordinate: Coordinate,
-            start_date: datetime,
-            end_date: datetime,
+        self,
+        coordinate: Coordinate,
+        start_date: datetime,
+        end_date: datetime,
     ) -> Any:
         nearest_station = self._find_nearest_station(coordinate)
 

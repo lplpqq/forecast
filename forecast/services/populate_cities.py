@@ -25,11 +25,13 @@ MIN_POPULATION = 150_000
 
 class PopulateCitiesService(Service):
     def __init__(
-            self,
-            connector: aiohttp.BaseConnector,
-            session_factory: async_sessionmaker[AsyncSession],
+        self,
+        db_session_factory: async_sessionmaker[AsyncSession],
+        *,
+        connector: aiohttp.BaseConnector,
     ) -> None:
-        super().__init__(BASE_URL, connector, session_factory)
+        super().__init__(db_session_factory, connector=connector, base_url=BASE_URL)
+
         self._cities_df: pd.DataFrame | None = None
 
     async def fetch_cities_list(self) -> pd.DataFrame:
@@ -42,10 +44,7 @@ class PopulateCitiesService(Service):
         )
 
         try:
-            df = pd.read_csv(
-                CITIES_CACHE_FILE,
-                usecols=COLUMNS
-            )
+            df = pd.read_csv(CITIES_CACHE_FILE, usecols=COLUMNS)
             return df.where(df['population'] >= MIN_POPULATION)
         except FileNotFoundError:
             pass
@@ -76,9 +75,9 @@ class PopulateCitiesService(Service):
 
     async def populate_cities(self) -> None:
         async with self._db_session_factory() as session:
-            present_locations = set((await session.execute(
-                select(City.latitude, City.longitude))
-            ).all())
+            present_locations = set(
+                (await session.execute(select(City.latitude, City.longitude))).all()
+            )
 
             for row in self._cities_df.itertuples(index=False):
                 city_tuple = CityTuple._make(row)

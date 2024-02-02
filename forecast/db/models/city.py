@@ -3,8 +3,8 @@ from __future__ import annotations
 import typing
 from typing import Self
 
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pydantic_extra_types.coordinate import Coordinate
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from forecast.db.models.base import Base
 
@@ -41,7 +41,4 @@ class City(Base):
 
     @property
     def coordinate(self):
-        return Coordinate(
-            latitude=self.latitude,
-            longitude=self.longitude
-        )
+        return Coordinate(latitude=self.latitude, longitude=self.longitude)

@@ -5,16 +5,14 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from forecast.config import Config
-
 
 def create_engine(url: str) -> AsyncEngine:
-    engine = create_async_engine(url, echo=False, pool_size=500)
+    engine = create_async_engine(url, echo=False, pool_size=50)
 
     return engine
 
 
 async def connect(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
-    async_session = async_sessionmaker(engine, expire_on_commit=False)
+    async_session = async_sessionmaker(engine, expire_on_commit=True, autoflush=True)
 
     return async_session

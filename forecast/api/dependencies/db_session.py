@@ -10,7 +10,7 @@ from forecast.db.connect import connect, create_engine
 
 class SessionFactoryProvider:
     def __init__(self) -> None:
-        self._engine = create_engine(config)
+        self._engine = create_engine(config.db.connection_string)
         self._session_factory: None | async_sessionmaker[AsyncSession] = None
 
     async def __call__(self) -> async_sessionmaker[AsyncSession]:

@@ -1,6 +1,6 @@
 import { Autocomplete, Loader } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface City {
   name: string;
@@ -27,12 +27,21 @@ const SearchBar = () => {
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<City[]>([]);
+  const [selectedCity, setSelectedCity] = useState<City | null>();
 
   const displayData = useMemo(() => {
     return data.map(city => `${city.name}, ${city.country}`)
   }, [data])
 
+  useEffect(() => {
+    console.log(selectedCity)
+  }, [selectedCity])
+
   const handleChange = (newValue: string) => {
+    if (displayData.includes(newValue)) {
+      setSelectedCity(data[displayData.indexOf(newValue)]);
+    }
+
     setValue(newValue);
 
     const trimmed = newValue.trim()

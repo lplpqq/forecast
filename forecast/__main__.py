@@ -10,7 +10,6 @@ from forecast.config import config
 from forecast.db.connect import connect, create_engine
 from forecast.logging import logger_provider
 from forecast.parse_args import create_parser, parse_args
-from forecast.providers import VisualCrossing, WorldWeatherOnline
 from forecast.providers.meteostat import Meteostat
 from forecast.services import CollectorService, PopulateCitiesService
 
@@ -34,14 +33,15 @@ async def run_gather(
         # visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         # * Services init
-        populate_cities_service = PopulateCitiesService(connector, session_factory)
+        populate_cities_service = PopulateCitiesService(
+            session_factory, connector=connector
+        )
 
         collector_service = CollectorService(
-            connector,
             session_factory,
             start_date,
             end_date,
-            [meteostat], #world_weather, visual_crossing],
+            [meteostat],  # world_weather, visual_crossing],
             event_loop,
         )
 
