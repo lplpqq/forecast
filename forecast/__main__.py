@@ -23,14 +23,14 @@ async def run_gather(
     logger.info('Starting')
     start = time.perf_counter()
 
-    engine = create_engine(config)
+    engine = create_engine(config.db.connection_string)
     session_factory = await connect(engine)
 
     async with aiohttp.TCPConnector() as connector:
         # * Providers init
         # openmeteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         meteostat = Meteostat(connector, event_loop=event_loop)
-        world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
+        # world_weather = WorldWeatherOnline(connector, config.data_sources.world_weather_online.api_key)
         # visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         # * Services init

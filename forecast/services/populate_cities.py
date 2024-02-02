@@ -20,6 +20,7 @@ CITIES_CSV_IN_ARCHIVE_NAME = 'worldcities.csv'
 
 BASE_URL = 'https://simplemaps.com/static/data/world-cities/basic'
 COLUMNS = ('city', 'lat', 'lng', 'country', 'population')
+MIN_POPULATION = 150_000
 
 
 class PopulateCitiesService(MininalServiceWithEverything):
@@ -45,7 +46,7 @@ class PopulateCitiesService(MininalServiceWithEverything):
                 CITIES_CACHE_FILE,
                 usecols=COLUMNS
             )
-            return df
+            return df.where(df['population'] >= MIN_POPULATION)
         except FileNotFoundError:
             pass
 

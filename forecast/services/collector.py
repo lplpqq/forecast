@@ -25,7 +25,7 @@ from forecast.providers.models.weather import Weather
 from forecast.services.base import ServiceWithDB
 
 DEFAULT_WAIT_TIME_SECS = 10
-CONCURRENT_SESSIONS_ALLOWED = 50
+CONCURRENT_SESSIONS_ALLOWED = 400
 
 
 class CollectorService(ServiceWithDB):
@@ -65,9 +65,6 @@ class CollectorService(ServiceWithDB):
             self._map_providers(lambda provider: provider.setup())
         )
 
-        self._present_date_data: dict[
-            tuple[str, str], tuple[datetime, datetime]
-        ] = {}
         async with self._db_session_factory() as session:
             self._cities = (await session.scalars(
                 select(City).order_by(City.population.desc()))
@@ -120,45 +117,27 @@ class CollectorService(ServiceWithDB):
         return data
 
     async def _collect_city(self, city: City, provider: Provider) -> None:
+        try:
+            data = await self._fetch(
+                provider, city.coordinate, self._start_date, self._end_date
+            )
+        except RetryError:
+            self.logger.info(
+                f'We did our best to wait for the timeout on {provider.name} provider to go away. '
+                f'But it never id so. We are skipping the provider for {city.name} city'
+            )
+            return
+
+        if data is None:
+            self.logger.warning(
+                f'Could not get data for city {city.name} from provider {provider.name}. '
+                f'We will be skipping it...'
+            )
+            return
+
         async with self._sessions_semaphore:
-            # TODO: Proper checks in order to determine wheather we need to fetch data for this city. We really need do it advance, on setup. It's really not that complicated and won't be that taxing on memory to determine wheather we should just skip the city.
             async with self._db_session_factory() as session:
-                # TODO: Don't perform this query on every city. Try to cache where possible or prefect all of the data in advance. This is REALLY slow and we run out of connections the sqlalchemy connection pool. The semaphore is setup for that exact reason.
-                present_data_query = select(WeatherJournal.date).where(
-                    WeatherJournal.data_source == provider.name,
-                    WeatherJournal.city_id == city.id,
-                    WeatherJournal.date >= self._start_date,
-                    WeatherJournal.date <= self._end_date,
-                )
-                present_data_dates = set(
-                    (await session.scalars(present_data_query)).all()
-                )
-
-                start_date, end_date = self._start_date, self._end_date
-                if len(present_data_dates) > 0:
-                    start_date = min(min(present_data_dates), self._start_date)
-                    end_date = max(max(present_data_dates), self._end_date)
-
-                try:
-                    data = await self._fetch(
-                        provider, city.coordinate, start_date, end_date
-                    )
-                except RetryError:
-                    self.logger.info(
-                        f'We did our best to wait for the timeout on {provider.name = } to go away. But it never id so. We are skipping the provider for {city.name = }'
-                    )
-                    return
-
-                if data is None:
-                    self.logger.warning(
-                        f'Could not get data for {city.name = } from provider {provider.name = }. We will be skipping it...'
-                    )
-                    return
-
                 for weather in data:
-                    if weather.date in present_data_dates:
-                        continue
-
                     session.add(
                         WeatherJournal.from_weather_tuple(weather, city.id)
                     )

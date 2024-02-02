@@ -8,10 +8,8 @@ from sqlalchemy.ext.asyncio import (
 from forecast.config import Config
 
 
-def create_engine(from_config: Config) -> AsyncEngine:
-    engine = create_async_engine(
-        from_config.db.connection_string, echo=False, pool_size=100, max_overflow=0
-    )
+def create_engine(url: str) -> AsyncEngine:
+    engine = create_async_engine(url, echo=False, pool_size=500)
 
     return engine
 
