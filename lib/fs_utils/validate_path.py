@@ -6,7 +6,7 @@ from lib.fs_utils.format_path import format_path
 
 AccessMode: TypeAlias = Literal['readable', 'writable', 'executable']
 
-DEFAULT_CHECKS: set[AccessMode] = set(['readable', 'writable'])
+DEFAULT_CHECKS: set[AccessMode] = {'readable', 'writable'}
 ACCESS_MODE_TO_CODE: dict[AccessMode, int] = {
     'readable': os.R_OK,
     'writable': os.W_OK,

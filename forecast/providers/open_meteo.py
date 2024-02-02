@@ -4,7 +4,6 @@ import aiohttp
 from pydantic_extra_types.coordinate import Coordinate
 
 from forecast.providers.base import Provider
-from forecast.providers.enums import Granularity
 from forecast.providers.models.weather import Weather
 
 BASE_URL = 'https://archive-api.open-meteo.com/v1'
@@ -16,29 +15,20 @@ class OpenMeteo(Provider):
 
     async def get_historical_weather(
         self,
-        granularity: Granularity,
         coordinate: Coordinate,
         start_date: datetime,
         end_date: datetime,
     ) -> list[Weather]:
-        if granularity is Granularity.HOUR:
-            key = 'hourly'
-        elif granularity is Granularity.DAY:
-            key = 'daily'
-        else:
-            raise ValueError(...)
-
-        raw = await self.session.api_get(
+        raw = await self.session.get_json(
             '/archive',
             params={
                 'latitude': coordinate.latitude,
                 'longitude': coordinate.longitude,
                 'start_date': start_date.strftime('%Y-%m-%d'),
                 'end_date': end_date.strftime('%Y-%m-%d'),
-                key: [
+                'hourly': [
                     'temperature_2m',
                     'relative_humidity_2m',
-                    'apparent_temperature',
                     'precipitation',
                     'rain',
                     'snowfall',
@@ -62,10 +52,8 @@ class OpenMeteo(Provider):
         for (
             time,
             temperature,
-            apparent_temperature,
             pressure,
             wind_speed,
-            wind_gust_speed,
             wind_direction,
             humidity,
             clouds,
@@ -74,10 +62,8 @@ class OpenMeteo(Provider):
         ) in zip(
             hourly['time'],
             hourly['temperature_2m'],
-            hourly['apparent_temperature'],
             hourly['surface_pressure'],
             hourly['wind_speed_10m'],
-            hourly['wind_gusts_10m'],
             hourly['wind_direction_10m'],
             hourly['relative_humidity_2m'],
             hourly['cloud_cover'],
@@ -89,12 +75,8 @@ class OpenMeteo(Provider):
                     data_source=self.name,
                     date=datetime.strptime(time, '%Y-%m-%dT%H:%M'),
                     temperature=temperature,
-                    apparent_temperature=apparent_temperature,
                     pressure=pressure,
                     wind_speed=round(wind_speed / 3.6, 2),  # converts km/h to m/s
-                    wind_gust_speed=round(
-                        wind_gust_speed / 3.6, 2
-                    ),  # converts km/h to m/s
                     wind_direction=wind_direction,
                     humidity=humidity,
                     clouds=clouds,

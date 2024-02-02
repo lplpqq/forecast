@@ -8,70 +8,91 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from forecast.api_client_session import ExtendedClientSession
-from forecast.db import models
+from forecast.db.models import City
+from forecast.services.base import Service
 from forecast.services.models import CityTuple
 from lib.fs_utils import validate_path
 
-# TODO: Create a class for this we are going to have other services as well. I think it's a nice architecture.
 CACHE_FOLDER: Final[Path] = Path('./.cache')
 CITIES_CACHE_FILE: Final[Path] = CACHE_FOLDER.joinpath('./cities/cities.csv')
 
 CITIES_CSV_IN_ARCHIVE_NAME = 'worldcities.csv'
 
+BASE_URL = 'https://simplemaps.com/static/data/world-cities/basic'
+COLUMNS = ('city', 'lat', 'lng', 'country', 'population')
+MIN_POPULATION = 1_000_000
 
-async def fetch_cities_list(connector: aiohttp.BaseConnector) -> pd.DataFrame:
-    validate_path(
-        CITIES_CACHE_FILE,
-        'file',
-        {'readable', 'writable'},
-        autocreate_only_parent=True,
-        autocreate_is_recursive=True,
-    )
 
-    if CITIES_CACHE_FILE.exists():
-        df = pd.read_csv(CITIES_CACHE_FILE)
-        return df
+class PopulateCitiesService(Service):
+    def __init__(
+        self,
+        db_session_factory: async_sessionmaker[AsyncSession],
+        *,
+        connector: aiohttp.BaseConnector,
+    ) -> None:
+        super().__init__(db_session_factory, connector=connector, base_url=BASE_URL)
 
-    async with ExtendedClientSession(
-        'https://simplemaps.com/static/data/world-cities/basic', connector
-    ) as session:
-        archive = await session.get_file('/simplemaps_worldcities_basicv1.76.zip')
-        file_io = io.BytesIO(archive)
+        self._cities_df: pd.DataFrame | None = None
 
-        with zipfile.ZipFile(file_io) as archive_handle:
-            if CITIES_CSV_IN_ARCHIVE_NAME not in archive_handle.namelist():
+    async def fetch_cities_list(self) -> pd.DataFrame:
+        validate_path(
+            CITIES_CACHE_FILE,
+            'file',
+            {'readable', 'writable'},
+            autocreate_only_parent=True,
+            autocreate_is_recursive=True,
+        )
+
+        try:
+            df = pd.read_csv(CITIES_CACHE_FILE, usecols=COLUMNS)
+            return df[
+                (df['population'] >= MIN_POPULATION)
+                & ~(df['country'].isin(['China', 'India']))
+            ]
+        except FileNotFoundError:
+            pass
+
+        archive = await self._aiohttp_session.get_raw(
+            '/simplemaps_worldcities_basicv1.76.zip'
+        )
+
+        with zipfile.ZipFile(io.BytesIO(archive)) as archive_handle:
+            try:
+                data = archive_handle.read(CITIES_CSV_IN_ARCHIVE_NAME)
+            except KeyError:
                 raise ValueError(
                     f'The wanted file "{CITIES_CSV_IN_ARCHIVE_NAME}" is not found in the archive'
                 )
 
-            data = archive_handle.read(CITIES_CSV_IN_ARCHIVE_NAME)
-            csv_file_io = io.BytesIO(data)
+        df = pd.read_csv(io.BytesIO(data), usecols=COLUMNS)
+        df['population'] = df['population'].fillna(value=0).astype(int)
+        # fill None values with 0 in order to successfully cast population into integer
+        df.dropna(axis=0)
+        df.to_csv(CITIES_CACHE_FILE, index=False)
 
-    df = pd.read_csv(csv_file_io)
-    df = df.where(df['population'] > 1000).dropna(axis=0, how='any')
+        return df[
+            (df['population'] >= MIN_POPULATION)
+            & ~(df['country'].isin(['China', 'India']))
+        ]
 
-    df.to_csv(CITIES_CACHE_FILE, index=False)
+    async def setup(self) -> None:
+        await super().setup()
+        self._cities_df = await self.fetch_cities_list()
 
-    return df
+    async def populate_cities(self) -> None:
+        async with self._db_session_factory() as session:
+            present_locations = set(
+                (await session.execute(select(City.latitude, City.longitude))).all()
+            )
 
+            for row in self._cities_df.itertuples(index=False):
+                city_tuple = CityTuple._make(row)
+                if (city_tuple.latitude, city_tuple.longitude) in present_locations:
+                    continue
 
-async def populate_cities(
-    connector: aiohttp.BaseConnector, session_factory: async_sessionmaker[AsyncSession]
-) -> None:
-    df = await fetch_cities_list(connector)
+                session.add(City.from_city_named_tuple(city_tuple))
 
-    async with session_factory() as session:
-        present_source_ids_query = select(models.City.source_list_id)
-        present_source_ids = set(await session.scalars(present_source_ids_query))
+            await session.commit()
 
-        for row in df.itertuples():
-            city_tuple = CityTuple._make(row[1:])
-            if int(city_tuple.id) in present_source_ids:
-                continue
-
-            new_city = models.City.from_city_named_tuple(city_tuple)
-
-            session.add(new_city)
-
-        await session.commit()
+    async def _run(self) -> None:
+        await self.populate_cities()
