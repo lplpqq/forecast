@@ -1,3 +1,8 @@
+export function omit(key: any, obj: any) {
+  const { [key]: omitted, ...rest } = obj;
+  return rest;
+}
+
 export const BASE_URL = `http://localhost:8080`
 
 export interface City {

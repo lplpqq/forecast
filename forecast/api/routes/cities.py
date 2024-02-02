@@ -31,7 +31,10 @@ async def get_cities(
 
     search_query = (
         select(City.name, City.country_name)
-        .where(City.name.ilike(f'{query}%'))
+        .where(
+            City.name.ilike(f'{query}%') |
+            City.country_name.ilike(f'{query}%')
+        )
         .order_by(City.population.desc())
         .limit(DEFAULT_RESULT_COUNT)
     )

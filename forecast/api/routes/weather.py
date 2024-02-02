@@ -49,11 +49,11 @@ async def get_weather(
             func.avg(WeatherJournal.snow).label('snow'),
         )
         .where(
-            WeatherJournal.date >= (cursor or from_date),
-            WeatherJournal.date <= to_date,
+            # WeatherJournal.date <= datetime(2023, 10, 3),
+            #WeatherJournal.date <= to_date,
             WeatherJournal.city_id == city.id,
-            WeatherJournal.precipitation.isnot(None),
-            WeatherJournal.snow.isnot(None),
+            # WeatherJournal.precipitation.isnot(None),
+            # WeatherJournal.snow.isnot(None),
         )
         .group_by(WeatherJournal.date)
         .order_by(WeatherJournal.date)
@@ -61,6 +61,7 @@ async def get_weather(
     )
 
     history = (await session.execute(history_query)).all()
+    print(history)
     data = [WeatherData.model_validate(model._mapping) for model in history]
 
     next_date = None

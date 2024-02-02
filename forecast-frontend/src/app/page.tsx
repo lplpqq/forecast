@@ -2,19 +2,67 @@
 
 import DataView from '@/components/DataView';
 import SearchBar from '@/components/SearchBar';
-import { City } from '@/schema';
+import { BASE_URL, City, WeatherData, WeatherResponse, omit } from '@/schema';
 import { DateInput } from '@mantine/dates';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+const fetchData = async (forCity: City, dateRange: [Date, Date]) => {
+  const params = new URLSearchParams({
+    city: forCity.name,
+    from: dateRange[0].toISOString(),
+    to: dateRange[1].toISOString()
+  });
+
+  const response = await fetch(`${BASE_URL}/weather?${params}`, {
+    'method': 'GET'
+  });
+
+  const results: WeatherResponse = await response.json();
+  return results;
+};
 
 
 export default function Home() {
-  const [data, setData] = useState<City | null>(null);
+  const [city, setCity] = useState<City | null>(null);
 
-  const [firstDate, setFirstDate] = useState<Date | null>(new Date(2000, 1, 1));
-  const [secondDate, setSecondDate] = useState<Date | null>(new Date(2022, 1, 1));
+  const [firstDate, setFirstDate] = useState<Date | null>(new Date(2000, 1, 1, 0, 0, 0));
+  const [secondDate, setSecondDate] = useState<Date | null>(new Date(2022, 1, 1, 0, 0, 0));
+
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<WeatherResponse | null>(null)
+
+  useEffect(() => {
+    if (!city || firstDate === null || secondDate === null) return;
+
+    setLoading(true);
+
+    fetchData(city, [firstDate, secondDate]).then(result => {
+      setLoading(false);
+
+      // * Whatever, I don't really care at this point
+      if (!result.data) return;
+
+      const dataWithParsedDates: WeatherData[] = [];
+
+      for (let item of result.data) {
+        dataWithParsedDates.push({
+          //@ts-ignore
+          date: new Date(item.date),
+          ...omit('date', item)
+        })
+      }
+
+      console.log(dataWithParsedDates);
+
+      setData({
+        data: dataWithParsedDates,
+        next_date: result.next_date
+      });
+    });
+  }, [city, firstDate, secondDate])
 
   const dataChangeHandler = (newCity: City) => {
-    setData(newCity);
+    setCity(newCity);
   }
 
   return (
@@ -27,10 +75,6 @@ export default function Home() {
               <SearchBar
                 dataChangeHandler={dataChangeHandler}
               />
-              <button className='bg-yellow-400 px-4 py-4 rounded-3xl text-black'>
-                Refresh
-              </button>
-
             </div>
             <div className='w-full items-center text-md font-semibold flex gap-4 flex-col'>
               <div>Select the dates</div>
@@ -38,12 +82,14 @@ export default function Home() {
               <div className='w-fill flex flex-row gap-4 items-center'>
                 <DateInput
                   value={firstDate}
+                  // @ts-ignore
                   onChange={setFirstDate}
                   label="From date"
                   placeholder="The starting date..."
                 />
                 <DateInput
                   value={secondDate}
+                  // @ts-ignore
                   onChange={setSecondDate}
                   label="To date"
                   placeholder="The end date..."
@@ -55,10 +101,9 @@ export default function Home() {
       </div>
 
       <div>
-        <DataView
-          dateRange={[firstDate, secondDate]}
-          forCity={data}
-        />
+        {(!loading && data !== null) ? <DataView
+          data={data}
+        /> : null}
       </div>
     </main >
   );

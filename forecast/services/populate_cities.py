@@ -20,7 +20,7 @@ CITIES_CSV_IN_ARCHIVE_NAME = 'worldcities.csv'
 
 BASE_URL = 'https://simplemaps.com/static/data/world-cities/basic'
 COLUMNS = ('city', 'lat', 'lng', 'country', 'population')
-MIN_POPULATION = 1_000_000
+MIN_POPULATION = 2_000_000
 
 
 class PopulateCitiesService(Service):

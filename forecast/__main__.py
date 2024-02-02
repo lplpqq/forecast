@@ -33,16 +33,16 @@ async def run_gather(
 
         # open_meteo = OpenMeteo(connector, config.data_sources.open_meteo.api_key)
         meteostat = Meteostat(connector, event_loop=event_loop)
-        world_weather = WorldWeatherOnline(
-            connector, config.data_sources.world_weather_online.api_key
-        )
+        # world_weather = WorldWeatherOnline(
+        #     connector, config.data_sources.world_weather_online.api_key
+        # )
         # visual_crossing = VisualCrossing(connector, event_loop=event_loop)
 
         async with CollectorService(
             session_factory,
             start_date,
             end_date,
-            [meteostat, world_weather],
+            [meteostat],
             event_loop,
         ) as collector_service:
             await collector_service.run()
