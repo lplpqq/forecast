@@ -1,6 +1,7 @@
 import Header from '@/components/Header';
-import { ColorSchemeScript, MantineProvider } from '@mantine/core';
+import { ColorSchemeScript, MantineProvider, createTheme } from '@mantine/core';
 import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -11,6 +12,10 @@ export const metadata: Metadata = {
   title: "Forecast app",
   description: "Get your weather forecasts!",
 };
+
+const theme = createTheme({
+  /** Put your mantine theme override here */
+});
 
 export default function RootLayout({
   children,
@@ -28,6 +33,6 @@ export default function RootLayout({
           {children}
         </MantineProvider>
       </body>
-    </html>
+    </html >
   );
 }
